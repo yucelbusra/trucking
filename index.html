@@ -125,7 +125,7 @@ footer{margin-top:48px;font-family:var(--mono);font-size:11px;color:var(--steel)
     <h1>Panel <span>Trucking</span> Planner</h1>
     <p>load manifest generator &mdash; install-order stacking, greedy packer v1</p>
   </div>
-  <div class="manifest-no">standalone port of pyRevit trucking module<b>v3 &mdash; support-aware &middot; centered rows</b><b id="hdrDate"></b></div>
+  <div class="manifest-no">standalone port of pyRevit trucking module<b>v5 &mdash; scheduled &middot; beam-packed</b><b id="hdrDate"></b></div>
 </header>
 
 <!-- STEP 1 -->
@@ -181,6 +181,8 @@ footer{margin-top:48px;font-family:var(--mono);font-size:11px;color:var(--steel)
       <div class="sgroup">Logistics</div>
       <div class="field"><label>Trucks on site at once <span class="unit">count</span></label><input type="number" id="s_count" value="2" min="1" step="1"></div>
       <div class="field"><label>Max payload per truck <span class="unit">lb &mdash; 0 = ignore</span></label><input type="number" id="s_payload" value="45000" min="0" step="100"></div>
+      <div class="field"><label>Panels installed per day <span class="unit">count &mdash; 0 = ignore</span></label><input type="number" id="s_rate" value="15" min="0" step="1"></div>
+      <div class="field"><label>Packing priority <span class="unit">trade-off</span></label><select id="s_prio"><option value="day1">Max daily throughput</option><option value="trucks">Fewest trucks</option></select></div>
     </div>
     <div class="settings-actions">
       <button class="small" id="btnSaveSet">Save settings (.json)</button>
@@ -196,6 +198,7 @@ footer{margin-top:48px;font-family:var(--mono);font-size:11px;color:var(--steel)
 <!-- RESULTS -->
 <section id="results">
   <div class="sumstrip" id="sumstrip"></div>
+  <div id="schedbox"></div>
   <h3 class="rsec">Truck stacks &mdash; side view, install order runs top-down; load bottom layer first</h3>
   <div id="trucks"></div>
   <div id="oversizebox"></div>
@@ -342,6 +345,8 @@ function readSettings(){
     overhang_width_in:   P($("s_ovw").value, 0),
     max_per_row:         Math.max(1, Math.floor(num($("s_maxrow").value)||3)),
     support_tol_in:      Math.max(0, P($("s_suptol").value, 12)),
+    pack_priority:       $("s_prio").value,
+    install_rate:        Math.max(0, Math.floor(num($("s_rate").value))),
     panel_thickness_in:  P($("s_thick").value, 6.625),
     trucks_on_site:      Math.max(1, Math.floor(num($("s_count").value)||2)),
     max_payload_lb:      Math.max(0, num($("s_payload").value))
@@ -355,7 +360,7 @@ function readSettings(){
 }
 $("btnSaveSet").addEventListener("click",()=>{
   const raw={};
-  ["s_len","s_wid","s_stack","s_dun","s_gap2","s_gapm","s_ovf","s_ovb","s_ovw","s_thick","s_count","s_payload","s_maxrow","s_suptol"]
+  ["s_len","s_wid","s_stack","s_dun","s_gap2","s_gapm","s_ovf","s_ovb","s_ovw","s_thick","s_count","s_payload","s_maxrow","s_suptol","s_prio","s_rate"]
     .forEach(id=>raw[id]=$(id).value);
   downloadText("trucking_settings.json", JSON.stringify(raw,null,2), "application/json");
 });
@@ -416,27 +421,18 @@ function buildPanels(){
   return {panels, errs:[], warns};
 }
 
-// ------------------------------------------- support-aware packer v2
-// Greedy truck assignment + per-truck DP re-layout, run under several
-// placement strategies; the best resulting plan (fewest trucks, then fewest
-// layers) is kept.
-// Physical rules: rows are CENTERED on the deck; a row may overhang the row
-// supporting it by at most support_tol per end (pyramid stacking).
-// Install order still runs top-down within each truck.
+// ------------------------------------------- support-aware packer v4
+// Beam-search packer. Explores many alternative panel-to-truck assignments
+// and keeps the plan that (in priority order):
+//   1. opens each additional truck as LATE in the install sequence as
+//      possible  -> the trucks on site together carry the longest possible
+//      run of consecutive installs (maximizes first-day capacity),
+//   2. uses the fewest trucks,
+//   3. uses the fewest total layers.
+// Per-truck stacks are validated by DP: rows CENTERED on the deck, a row may
+// overhang its supporting row by at most support_tol per end, install order
+// top-down, row length / panels-per-row / stack height limits respected.
 function packTrucks(seq, st){
-  const STRATS=["oldest","fewest_rows","min_growth","newest"];
-  let best=null;
-  for(const strat of STRATS){
-    const R=packOnce(seq, st, strat);
-    const score=[R.trucks.length, R.trucks.reduce((s,t)=>s+t.layers.length,0)];
-    if(!best || score[0]<best.score[0] || (score[0]===best.score[0] && score[1]<best.score[1])){
-      best={strat, score};
-    }
-  }
-  return packOnce(seq, st, best.strat);   // final run leaves panel fields consistent
-}
-
-function packOnce(seq, st, strat){
   const L_max=st.truck_length_in+st.overhang_front_in+st.overhang_back_in;
   const W_max=st.truck_width_in+2*st.overhang_width_in;
   const H_max=st.max_stack_height_in;
@@ -446,11 +442,11 @@ function packOnce(seq, st, strat){
   const K=Math.max(1,Math.floor(st.trucks_on_site));
   const PAY=st.max_payload_lb;                    // 0 = ignore
   const useWeight=PAY>0;
-  const tol2=2*Math.max(0, st.support_tol_in||0); // total allowed unsupported length (both ends)
+  const tol2=2*Math.max(0, st.support_tol_in||0);
   const maxRows=Math.max(1, Math.floor(H_max/(dun+thick)));
+  const BEAM=128;
 
-  // Gap rule: with n panels there are n-1 gaps. The gap BEFORE the LAST panel
-  // is always gap2; every other gap is gapM.  n=2 -> gap2 only.
+  // Gap rule: gap before the LAST panel in a row is gap2; all others gapM.
   const layerLen=lay=>{
     const n=lay.length;
     let t=lay.reduce((s,p)=>s+p._lay_len,0);
@@ -459,13 +455,7 @@ function packOnce(seq, st, strat){
   };
   const wOf=p=>(p.weight_lb==null?0:p.weight_lb);
 
-  // DP re-layout of one truck's panel list P (install order):
-  // cut P into consecutive rows, top row first, such that
-  //   - each row: count<=maxN and length<=L_max
-  //   - support: len(upper) <= len(lower)+tol2 for every adjacent pair
-  //   - number of rows <= maxRows
-  // Objective: fewest rows; tie-break widest bottom row.
-  // Returns rows (top->bottom) or null if no valid stack exists.
+  // DP stack layout for one truck's panel list; returns rows (top->bottom) or null.
   function layout(P){
     const m=P.length;
     if(!m) return [];
@@ -480,13 +470,13 @@ function packOnce(seq, st, strat){
       }
       return lenMemo[k];
     };
-    const dp=Array.from({length:m},()=>new Array(m).fill(-1));   // min rows
-    const par=Array.from({length:m},()=>new Array(m).fill(-1));  // predecessor row start
+    const dp=Array.from({length:m},()=>new Array(m).fill(-1));
+    const par=Array.from({length:m},()=>new Array(m).fill(-1));
     for(let i=0;i<m;i++){
       for(let j=Math.max(0,i-maxN+1); j<=i; j++){
         if(len(j,i)>L_max) continue;
         if(j===0){ dp[i][j]=1; par[i][j]=-2; continue; }
-        const cap=len(j,i)+tol2;   // the row ABOVE may be at most this long
+        const cap=len(j,i)+tol2;
         let bestR=-1,bestJ2=-1,bestLen=-1;
         for(let j2=Math.max(0,j-maxN); j2<=j-1; j2++){
           if(dp[j-1][j2]<0 || len(j2,j-1)>cap) continue;
@@ -513,44 +503,182 @@ function packOnce(seq, st, strat){
       if(pj===-2) break;
       i=j-1; j=pj;
     }
-    rows.reverse();               // rows[0] = TOP
+    rows.reverse();
     return rows;
   }
 
-  const trucks=[], open=[], oversize=[]; let nextNo=1;
-  const newTruck=()=>{ const t={no:nextNo++,panels:[],layers:[],height:0,weight:0}; trucks.push(t); open.push(t); return t; };
-
+  // ---- pre-filter oversize; precompute laydown dims ----
+  const oversize=[], loadable=[];
   for(const r of seq){
     r._lay_len=Math.max(r.width_in,r.height_in);
     r._lay_across=Math.min(r.width_in,r.height_in);
     r._wtOnly=false;
     if(r._lay_across>W_max || r._lay_len>L_max){ r._truck="OVERSIZE"; oversize.push(r); continue; }
     if(useWeight && wOf(r)>PAY){ r._truck="OVERSIZE"; r._wtOnly=true; oversize.push(r); continue; }
-
-    // candidate open trucks that can still form a valid stack with this panel
-    const cands=[];
-    for(const t of open){
-      if(useWeight && t.weight+wOf(r)>PAY) continue;
-      const rows=layout(t.panels.concat([r]));
-      if(rows) cands.push({t, rows, rowsN:rows.length, delta:rows.length-t.layers.length, age:t.no});
-    }
-    if(cands.length){
-      if(strat==="oldest")      cands.sort((a,b)=>a.age-b.age);
-      if(strat==="newest")      cands.sort((a,b)=>b.age-a.age);
-      if(strat==="fewest_rows") cands.sort((a,b)=>a.rowsN-b.rowsN||a.age-b.age);
-      if(strat==="min_growth")  cands.sort((a,b)=>a.delta-b.delta||a.age-b.age);
-      const c=cands[0];
-      c.t.panels.push(r); c.t.layers=c.rows;
-      c.t.height=c.rows.length*(dun+thick); c.t.weight+=wOf(r);
-      r._truck=c.t.no;
-    }else{
-      if(open.length>=K) open.shift();           // dispatch the oldest truck on site
-      const t=newTruck();
-      t.panels.push(r); t.layers=[[r]];
-      t.height=dun+thick; t.weight=wOf(r); r._truck=t.no;
-    }
+    loadable.push(r);
   }
-  return {trucks, oversize, layerLen, L_max, W_max};
+
+  // ---- beam search over truck assignments ----
+  // state: { trucks:[{panels,layers,weight}], openIdx:[..], opens:[panelIdx when each truck beyond the first K opened], layers:int }
+  const PRIO=st.pack_priority==="day1"?"day1":"trucks";
+
+  const cmpTrucks=(a,b)=>{           // fewest trucks, then latest opens, then fewest layers
+    if(a.trucks.length!==b.trucks.length) return a.trucks.length<b.trucks.length;
+    const n=Math.min(a.opens.length,b.opens.length);
+    for(let i=0;i<n;i++) if(a.opens[i]!==b.opens[i]) return a.opens[i]>b.opens[i];
+    return a.layers<b.layers;
+  };
+  const cmpDay1=(a,b)=>{             // latest FIRST extra truck, then fewest trucks, then latest opens, then fewest layers
+    const a0=a.opens.length?a.opens[0]:Infinity, b0=b.opens.length?b.opens[0]:Infinity;
+    if(a0!==b0) return a0>b0;
+    if(a.trucks.length!==b.trucks.length) return a.trucks.length<b.trucks.length;
+    const n=Math.min(a.opens.length,b.opens.length);
+    for(let i=1;i<n;i++) if(a.opens[i]!==b.opens[i]) return a.opens[i]>b.opens[i];
+    return a.layers<b.layers;
+  };
+
+  function beamSearch(cmp){
+    let beam=[{trucks:[], openIdx:[], opens:[], layers:0}];
+    loadable.forEach((r,pi)=>{
+      const next=[];
+      for(const stt of beam){
+        let any=false;
+        for(const ti of stt.openIdx){
+          const t=stt.trucks[ti];
+          if(useWeight && t.weight+wOf(r)>PAY) continue;
+          const rows=layout(t.panels.concat([r]));
+          if(!rows) continue;
+          any=true;
+          const trucks=stt.trucks.slice();
+          trucks[ti]={panels:t.panels.concat([r]), layers:rows, weight:t.weight+wOf(r)};
+          next.push({trucks, openIdx:stt.openIdx, opens:stt.opens,
+                     layers:stt.layers-t.layers.length+rows.length});
+        }
+        if(!any){
+          const trucks=stt.trucks.slice();
+          trucks.push({panels:[r], layers:[[r]], weight:wOf(r)});
+          let openIdx=stt.openIdx.concat([trucks.length-1]);
+          if(openIdx.length>K) openIdx=openIdx.slice(1);           // oldest truck dispatched
+          const opens=trucks.length>K ? stt.opens.concat([pi]) : stt.opens;
+          next.push({trucks, openIdx, opens, layers:stt.layers+1});
+        }
+      }
+      // dedupe identical assignments, keep best per key
+      const seen=new Map();
+      for(const stt of next){
+        const key=stt.trucks.map(t=>t.panels.map(p=>p._install_seq).join(",")).join("|");
+        const prev=seen.get(key);
+        if(!prev || cmp(stt,prev)) seen.set(key,stt);
+      }
+      // prune with per-truck-count buckets so alternative branch depths survive
+      const byCount=new Map();
+      for(const stt of seen.values()){
+        (byCount.get(stt.trucks.length)||byCount.set(stt.trucks.length,[]).get(stt.trucks.length)).push(stt);
+      }
+      const counts=[...byCount.keys()].sort((x,y)=>x-y);
+      const per=Math.max(8, Math.floor(BEAM/Math.max(1,counts.length)));
+      let pruned=[];
+      for(const c of counts){
+        pruned=pruned.concat(byCount.get(c).sort((a,b)=>cmp(a,b)?-1:cmp(b,a)?1:0).slice(0,per));
+      }
+      beam=pruned.sort((a,b)=>cmp(a,b)?-1:cmp(b,a)?1:0).slice(0,BEAM);
+    });
+    return beam;
+  }
+
+  // greedy candidate generators (cheap; guarantee sane fallbacks the beam may prune)
+  function runGreedy(strat){
+    const state={trucks:[], openIdx:[], opens:[], layers:0};
+    loadable.forEach((r,pi)=>{
+      const cands=[];
+      for(const ti of state.openIdx){
+        const t=state.trucks[ti];
+        if(useWeight && t.weight+wOf(r)>PAY) continue;
+        const rows=layout(t.panels.concat([r]));
+        if(rows) cands.push({ti, rows, rowsN:rows.length, delta:rows.length-t.layers.length});
+      }
+      if(cands.length){
+        if(strat==="oldest")      cands.sort((a,b)=>a.ti-b.ti);
+        if(strat==="newest")      cands.sort((a,b)=>b.ti-a.ti);
+        if(strat==="fewest_rows") cands.sort((a,b)=>a.rowsN-b.rowsN||a.ti-b.ti);
+        if(strat==="min_growth")  cands.sort((a,b)=>a.delta-b.delta||a.ti-b.ti);
+        const c=cands[0], t=state.trucks[c.ti];
+        state.layers+=c.rows.length-t.layers.length;
+        state.trucks[c.ti]={panels:t.panels.concat([r]), layers:c.rows, weight:t.weight+wOf(r)};
+      }else{
+        state.trucks.push({panels:[r], layers:[[r]], weight:wOf(r)});
+        state.openIdx=state.openIdx.concat([state.trucks.length-1]);
+        if(state.openIdx.length>K) state.openIdx=state.openIdx.slice(1);
+        if(state.trucks.length>K) state.opens=state.opens.concat([pi]);
+        state.layers+=1;
+      }
+    });
+    return state;
+  }
+
+  const finals=[...beamSearch(cmpTrucks), ...beamSearch(cmpDay1),
+                runGreedy("oldest"), runGreedy("newest"), runGreedy("fewest_rows"), runGreedy("min_growth")];
+
+  // ---- day-by-day site simulation ----
+  // Trucks arrive in numeric order, at most K on site. A truck leaves at the
+  // END of the day it becomes empty; its replacement arrives next morning.
+  // The crew installs up to RATE panels/day, strictly in install order; if the
+  // next needed panel is on a truck not yet on site, the crew is blocked for
+  // the rest of the day.
+  const RATE=Math.max(0, Math.floor(st.install_rate||0));
+  function simulate(state){
+    if(!RATE) return null;
+    const tNoOf=new Map();
+    state.trucks.forEach((t,ti)=>t.panels.forEach(p=>tNoOf.set(p,ti+1)));
+    const remaining=state.trucks.map(t=>t.panels.length);
+    const total=state.trucks.length;
+    let onSite=[], nextArrive=1, i=0, guard=0;
+    const days=[];
+    while(i<loadable.length && guard++<2000){
+      while(onSite.length<K && nextArrive<=total) onSite.push(nextArrive++);
+      const installed=[];
+      while(installed.length<RATE && i<loadable.length && onSite.indexOf(tNoOf.get(loadable[i]))>=0){
+        remaining[tNoOf.get(loadable[i])-1]--;
+        installed.push(loadable[i]); i++;
+      }
+      const blockedBy=(i<loadable.length && installed.length<RATE)?tNoOf.get(loadable[i]):null;
+      const departed=onSite.filter(tn=>remaining[tn-1]===0);
+      days.push({day:days.length+1, onSite:onSite.slice(), installed, blockedBy, departed});
+      onSite=onSite.filter(tn=>remaining[tn-1]>0);
+    }
+    return days;
+  }
+  const simCache=new Map();
+  const simOf=stt=>{ if(!simCache.has(stt)) simCache.set(stt,simulate(stt)); return simCache.get(stt); };
+  const cmpSched=(a,b)=>{        // more panels installed each day, earlier days first
+    const sa=simOf(a), sb=simOf(b);
+    const n=Math.max(sa.length,sb.length);
+    for(let d=0;d<n;d++){
+      const ca=d<sa.length?sa[d].installed.length:0, cb=d<sb.length?sb[d].installed.length:0;
+      if(ca!==cb) return ca>cb;
+    }
+    if(a.trucks.length!==b.trucks.length) return a.trucks.length<b.trucks.length;
+    return a.layers<b.layers;
+  };
+  const cmpTrucksSched=(a,b)=>{  // fewest trucks first, then best schedule
+    if(a.trucks.length!==b.trucks.length) return a.trucks.length<b.trucks.length;
+    return cmpSched(a,b);
+  };
+
+  let finalCmp;
+  if(RATE) finalCmp = PRIO==="day1" ? cmpSched : cmpTrucksSched;
+  else     finalCmp = PRIO==="day1" ? cmpDay1 : cmpTrucks;
+  let best=finals[0];
+  for(const stt of finals) if(finalCmp(stt,best)) best=stt;
+  if(!best) best={trucks:[],openIdx:[],opens:[],layers:0};
+  const schedule=RATE?simulate(best):null;
+
+  const trucks=best.trucks.map((t,i)=>{
+    for(const p of t.panels) p._truck=i+1;
+    return {no:i+1, panels:t.panels, layers:t.layers,
+            height:t.layers.length*(dun+thick), weight:t.weight};
+  });
+  return {trucks, oversize, layerLen, L_max, W_max, schedule, rate:RATE};
 }
 
 // ---------------------------------------------------------------- run
@@ -586,9 +714,20 @@ function renderResults(R){
   s+=cell(loaded+" / "+R.seq.length,"panels loaded");
   s+=cell(R.oversize.length,"oversize / special transport", R.oversize.length?"bad":"");
   s+=cell(R.trucks.reduce((m,t)=>Math.max(m,t.layers.length),0),"max layers on a truck");
+  {
+    const KK=Math.max(1,Math.floor(R.st.trucks_on_site||1));
+    const onFirst=new Set(R.trucks.slice(0,KK).flatMap(t=>t.panels?t.panels.map(p=>p._install_seq):t.layers.flat().map(p=>p._install_seq)));
+    let N=0; while(onFirst.has(N+1)) N++;
+    s+=cell("1\u2013"+N,"installs covered by first "+KK+" truck(s)","accent");
+  }
   if(anyWeight && R.st.max_payload_lb>0){
     const hv=R.trucks.reduce((m,t)=>Math.max(m,t.weight),0);
     s+=cell(Math.round(hv).toLocaleString()+" lb","heaviest truck");
+  }
+  if(R.schedule){
+    const blocked=R.schedule.filter(d=>d.blockedBy!=null).length;
+    s+=cell(R.schedule.length,"install days @ "+R.rate+"/day");
+    s+=cell(blocked,"days crew blocked by deliveries", blocked?"bad":"");
   }
   $("sumstrip").innerHTML=s;
   function cell(n,l,cls){return '<div class="sumcell"><div class="n '+(cls||"")+'">'+n+'</div><div class="l">'+l+'</div></div>';}
@@ -597,6 +736,23 @@ function renderResults(R){
   if(R.warns.length){
     $("sumstrip").insertAdjacentHTML("afterend",
       '<div class="msg note" style="display:block;margin-bottom:22px">'+R.warns.map(escapeHtml).join("<br>")+'</div>');
+  }
+
+  // delivery & install schedule
+  const sb=$("schedbox"); sb.innerHTML="";
+  if(R.schedule){
+    let h='<h3 class="rsec">Delivery &amp; install schedule &mdash; '+R.rate+' panels/day, '+Math.floor(R.st.trucks_on_site)+' trucks on site</h3>';
+    h+='<div class="plantable" style="margin-bottom:26px"><table><tr><th>Day</th><th>Trucks on site</th><th>Installed</th><th>Panels</th><th>End of day</th></tr>';
+    for(const d of R.schedule){
+      const names=d.installed.length?(d.installed[0].panel_name+(d.installed.length>1?" &rarr; "+d.installed[d.installed.length-1].panel_name:"")):"&mdash;";
+      const insts=d.installed.length?("inst#"+d.installed[0]._install_seq+(d.installed.length>1?"&ndash;"+d.installed[d.installed.length-1]._install_seq:"")):"";
+      let note=d.departed.length?d.departed.map(tn=>"TRUCK "+tn+" empty &mdash; departs").join(", "):"";
+      let blocked=d.blockedBy!=null?'<span style="color:var(--warn);font-weight:600">crew blocked &mdash; waiting for TRUCK '+d.blockedBy+'</span>':"";
+      h+="<tr><td>Day "+d.day+"</td><td>"+d.onSite.map(tn=>"TRUCK "+tn).join(", ")+"</td>"
+        +"<td>"+names+(insts?" <span style='color:var(--steel)'>("+insts+")</span>":"")+(blocked?"<br>"+blocked:"")+"</td>"
+        +"<td>"+d.installed.length+" / "+R.rate+"</td><td>"+(note||"&mdash;")+"</td></tr>";
+    }
+    sb.innerHTML=h+"</table></div>";
   }
 
   // truck cards with SVG stacks
@@ -758,6 +914,8 @@ function layoutTxt(R){
     +" | max stack "+fmtFtIn(st.max_stack_height_in)+" | dunnage "+fmtFtIn(st.dunnage_height_in)
     +" | gap before last panel "+fmtFtIn(st.two_panel_gap_in)+" / other gaps "+fmtFtIn(st.multi_panel_gap_in)
     +" | max "+Math.floor(st.max_per_row||3)+" per row | support tol "+fmtFtIn(st.support_tol_in||0)+" per end"
+    +" | priority: "+(st.pack_priority==="day1"?"max daily throughput":"fewest trucks")
+    +(R.rate?" | install rate "+R.rate+" panels/day":"")
     +" | overhang front "+fmtFtIn(st.overhang_front_in)+" / back "+fmtFtIn(st.overhang_back_in)+" / W "+fmtFtIn(st.overhang_width_in)+" per side"
     +" | panel thickness "+fmtFtIn(st.panel_thickness_in)
     +(st.max_payload_lb>0?" | max payload "+Math.round(st.max_payload_lb)+" lb":""));
@@ -765,6 +923,19 @@ function layoutTxt(R){
   lines.push("Rule: install order runs TOP-DOWN in each stack; physical loading is the reverse (bottom layer first).");
   lines.push("Rule: rows are CENTERED on the deck; a row overhangs its supporting row by at most the support tolerance per end.");
   lines.push("");
+  if(R.schedule){
+    lines.push(dash);
+    lines.push("DELIVERY & INSTALL SCHEDULE  ("+R.rate+" panels/day, "+Math.floor(st.trucks_on_site)+" trucks on site)");
+    for(const d of R.schedule){
+      const names=d.installed.length?(d.installed[0].panel_name+(d.installed.length>1?" -> "+d.installed[d.installed.length-1].panel_name:"")):"-";
+      let line="  Day "+d.day+": on site "+d.onSite.map(tn=>"TRUCK "+tn).join(", ")
+        +"  |  installed "+d.installed.length+"/"+R.rate+"  ("+names+")";
+      if(d.departed.length) line+="  |  "+d.departed.map(tn=>"TRUCK "+tn+" departs empty").join(", ");
+      if(d.blockedBy!=null) line+="  |  CREW BLOCKED - waiting for TRUCK "+d.blockedBy;
+      lines.push(line);
+    }
+    lines.push("");
+  }
   for(const t of R.trucks){
     const nP=t.layers.reduce((s,l)=>s+l.length,0), nLay=t.layers.length;
     lines.push(dash);
