@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel Trucking Planner</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F4F5F2;
+  --ink:#191C21;
+  --steel:#5B6472;
+  --line:#D8DBD4;
+  --card:#FFFFFF;
+  --hivis:#E8590C;
+  --hivis-soft:#FDEEE3;
+  --ok:#2B8A3E;
+  --warn:#C92A2A;
+  --warn-soft:#FBEAEA;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:'Archivo',system-ui,-apple-system,Segoe UI,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}*{transition:none!important}}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px 96px}
+
+/* ---------- header ---------- */
+header{border-bottom:3px solid var(--ink);padding:34px 0 20px;margin-bottom:32px;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.brand h1{font-stretch:87%;font-weight:800;font-size:30px;letter-spacing:.01em;text-transform:uppercase;line-height:1.05}
+.brand h1 span{color:var(--hivis)}
+.brand p{font-family:var(--mono);font-size:12px;color:var(--steel);margin-top:6px;letter-spacing:.02em}
+.manifest-no{font-family:var(--mono);font-size:12px;color:var(--steel);text-align:right}
+.manifest-no b{display:block;color:var(--ink);font-size:13px}
+
+/* ---------- step sections ---------- */
+.step{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--ink);margin-bottom:28px}
+.step-head{display:flex;align-items:baseline;gap:14px;padding:16px 22px;border-bottom:1px solid var(--line)}
+.step-tag{font-family:var(--mono);font-size:11px;font-weight:600;background:var(--ink);color:var(--paper);padding:3px 9px;letter-spacing:.08em}
+.step-head h2{font-size:17px;font-weight:700;font-stretch:92%;text-transform:uppercase;letter-spacing:.03em}
+.step-head .hint{font-size:13px;color:var(--steel);margin-left:auto}
+.step-body{padding:22px}
+
+/* ---------- upload ---------- */
+.drop{border:2px dashed var(--line);background:var(--paper);padding:38px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.drag{border-color:var(--hivis);background:var(--hivis-soft)}
+.drop .big{font-weight:700;font-size:16px}
+.drop .sub{font-family:var(--mono);font-size:12px;color:var(--steel);margin-top:6px}
+.filechip{display:none;margin-top:14px;font-family:var(--mono);font-size:13px}
+.filechip b{color:var(--hivis)}
+
+/* ---------- mapping ---------- */
+.maprow{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:14px;margin-top:18px}
+.mapcell label{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--steel);margin-bottom:5px}
+.mapcell label .req{color:var(--hivis)}
+select,input[type=text],input[type=number]{width:100%;padding:8px 10px;border:1px solid var(--line);background:#fff;font-family:var(--mono);font-size:13px;color:var(--ink);border-radius:0}
+select:focus,input:focus{outline:2px solid var(--hivis);outline-offset:-1px}
+.preview{margin-top:20px;overflow:auto;max-height:240px;border:1px solid var(--line)}
+.preview table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12px}
+.preview th{position:sticky;top:0;background:var(--ink);color:var(--paper);text-align:left;padding:6px 10px;font-weight:600;white-space:nowrap}
+.preview td{padding:5px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.preview tr:nth-child(even) td{background:var(--paper)}
+
+/* ---------- settings ---------- */
+.settings-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px 20px}
+.sgroup{grid-column:1/-1;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--steel);border-bottom:1px solid var(--line);padding-bottom:5px;margin-top:8px}
+.sgroup:first-child{margin-top:0}
+.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px}
+.field .unit{font-family:var(--mono);font-size:11px;color:var(--steel);font-weight:400}
+.settings-actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}
+
+/* ---------- buttons ---------- */
+button{font-family:var(--sans);font-weight:700;font-size:14px;letter-spacing:.03em;text-transform:uppercase;padding:11px 22px;border:1px solid var(--ink);background:#fff;color:var(--ink);cursor:pointer;border-radius:0;transition:background .12s,color .12s}
+button:hover{background:var(--ink);color:#fff}
+button.primary{background:var(--hivis);border-color:var(--hivis);color:#fff;font-size:15px}
+button.primary:hover{background:#C94A08;border-color:#C94A08}
+button.small{padding:7px 14px;font-size:12px}
+button:disabled{opacity:.4;cursor:not-allowed}
+button:disabled:hover{background:#fff;color:var(--ink)}
+button.primary:disabled:hover{background:var(--hivis);color:#fff}
+.runbar{display:flex;justify-content:center;margin:6px 0 34px}
+
+/* ---------- messages ---------- */
+.msg{padding:12px 16px;margin-top:14px;font-family:var(--mono);font-size:13px;display:none;border-left:4px solid}
+.msg.err{display:block;background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+.msg.ok{display:block;background:#EAF6EC;border-color:var(--ok);color:var(--ok)}
+.msg.note{display:block;background:var(--hivis-soft);border-color:var(--hivis);color:#9A3E08}
+
+/* ---------- results ---------- */
+#results{display:none}
+.sumstrip{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:28px}
+.sumcell{background:var(--card);padding:18px 20px}
+.sumcell .n{font-family:var(--mono);font-size:34px;font-weight:600;line-height:1}
+.sumcell .n.accent{color:var(--hivis)}
+.sumcell .n.bad{color:var(--warn)}
+.sumcell .l{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--steel);margin-top:7px}
+
+.truckcard{background:var(--card);border:1px solid var(--line);margin-bottom:22px}
+.truckcard .thead{display:flex;align-items:center;gap:14px;padding:13px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.truckcard .tno{font-family:var(--mono);font-weight:600;font-size:15px;background:var(--ink);color:var(--paper);padding:4px 12px}
+.truckcard .tmeta{font-family:var(--mono);font-size:12px;color:var(--steel)}
+.truckcard .tmeta b{color:var(--ink)}
+.truckcard svg{display:block;width:100%;height:auto}
+.truckcard .tfoot{padding:9px 20px;border-top:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--steel)}
+
+.plantable{overflow:auto;border:1px solid var(--line);background:var(--card)}
+.plantable table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12.5px}
+.plantable th{background:var(--ink);color:var(--paper);text-align:left;padding:8px 12px;font-weight:600;white-space:nowrap;position:sticky;top:0}
+.plantable td{padding:6px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.plantable tr:nth-child(even) td{background:var(--paper)}
+.plantable td.oversize{color:var(--warn);font-weight:600}
+.exportbar{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0 8px}
+h3.rsec{font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-stretch:92%;margin:30px 0 12px;padding-left:12px;border-left:4px solid var(--hivis)}
+footer{margin-top:48px;font-family:var(--mono);font-size:11px;color:var(--steel);border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="brand">
+    <h1>Panel <span>Trucking</span> Planner</h1>
+    <p>load manifest generator &mdash; install-order stacking, greedy packer v1</p>
+  </div>
+  <div class="manifest-no">standalone port of pyRevit trucking module<b id="hdrDate"></b></div>
+</header>
+
+<!-- STEP 1 -->
+<section class="step">
+  <div class="step-head"><span class="step-tag">STEP 1</span><h2>Panel list</h2><span class="hint">.xlsx / .xls / .csv &mdash; first sheet is read</span></div>
+  <div class="step-body">
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Upload panel list">
+      <div class="big">Drop your Excel file here, or click to browse</div>
+      <div class="sub">needs: install order &middot; panel name &middot; size (one "L x W" column or separate width / height) &middot; weight optional</div>
+      <div class="filechip" id="filechip"></div>
+    </div>
+    <input type="file" id="fileinput" accept=".xlsx,.xls,.csv" style="display:none">
+
+    <div id="mapping" style="display:none">
+      <div class="maprow">
+        <div class="mapcell"><label>Install order <span class="req">*</span></label><select id="col_order"></select></div>
+        <div class="mapcell"><label>Panel name <span class="req">*</span></label><select id="col_name"></select></div>
+        <div class="mapcell"><label>Size (combined "L x W")</label><select id="col_size"></select></div>
+        <div class="mapcell"><label>Width / length</label><select id="col_w"></select></div>
+        <div class="mapcell"><label>Height</label><select id="col_h"></select></div>
+        <div class="mapcell"><label>Weight (lb)</label><select id="col_wt"></select></div>
+        <div class="mapcell"><label>Panel type</label><select id="col_type"></select></div>
+        <div class="mapcell"><label>Wall / mark</label><select id="col_wall"></select></div>
+      </div>
+      <div class="msg note" style="display:block" id="mapnote">Map either the combined <b>Size</b> column or both <b>Width</b> and <b>Height</b>. Cells accept feet-inches ( 22'6" ) or plain inches.</div>
+      <div class="preview" id="preview"></div>
+    </div>
+    <div class="msg err" id="fileerr"></div>
+  </div>
+</section>
+
+<!-- STEP 2 -->
+<section class="step">
+  <div class="step-head"><span class="step-tag">STEP 2</span><h2>Trucking limits</h2><span class="hint">lengths accept 53' &middot; 8'6" &middot; plain inches</span></div>
+  <div class="step-body">
+    <div class="settings-grid">
+      <div class="sgroup">Truck envelope</div>
+      <div class="field"><label>Truck length <span class="unit">ft-in</span></label><input type="text" id="s_len" value="53'"></div>
+      <div class="field"><label>Truck width <span class="unit">ft-in</span></label><input type="text" id="s_wid" value="8'6&quot;"></div>
+      <div class="field"><label>Allowed overhang &mdash; length <span class="unit">ft-in</span></label><input type="text" id="s_ovl" value="0"></div>
+      <div class="field"><label>Allowed overhang &mdash; width, per side <span class="unit">ft-in</span></label><input type="text" id="s_ovw" value="0"></div>
+
+      <div class="sgroup">Stacking</div>
+      <div class="field"><label>Max stack height <span class="unit">ft-in</span></label><input type="text" id="s_stack" value="8'6&quot;"></div>
+      <div class="field"><label>Dunnage height <span class="unit">ft-in</span></label><input type="text" id="s_dun" value="4&quot;"></div>
+      <div class="field"><label>Panel thickness <span class="unit">ft-in</span></label><input type="text" id="s_thick" value="6.625&quot;"></div>
+      <div class="field"><label>Gap between 2 panels in a row <span class="unit">ft-in</span></label><input type="text" id="s_gap2" value="6&quot;"></div>
+      <div class="field"><label>Gap between 3 panels in a row <span class="unit">ft-in</span></label><input type="text" id="s_gap3" value="1'3&quot;"></div>
+
+      <div class="sgroup">Logistics</div>
+      <div class="field"><label>Trucks on site at once <span class="unit">count</span></label><input type="number" id="s_count" value="2" min="1" step="1"></div>
+      <div class="field"><label>Max payload per truck <span class="unit">lb &mdash; 0 = ignore</span></label><input type="number" id="s_payload" value="45000" min="0" step="100"></div>
+    </div>
+    <div class="settings-actions">
+      <button class="small" id="btnSaveSet">Save settings (.json)</button>
+      <button class="small" id="btnLoadSet">Load settings</button>
+      <input type="file" id="setinput" accept=".json" style="display:none">
+    </div>
+    <div class="msg err" id="seterr"></div>
+  </div>
+</section>
+
+<div class="runbar"><button class="primary" id="btnRun" disabled>Generate trucking plan</button></div>
+
+<!-- RESULTS -->
+<section id="results">
+  <div class="sumstrip" id="sumstrip"></div>
+  <h3 class="rsec">Truck stacks &mdash; side view, install order runs top-down; load bottom layer first</h3>
+  <div id="trucks"></div>
+  <div id="oversizebox"></div>
+  <h3 class="rsec">Per-panel plan</h3>
+  <div class="plantable" id="plantable"></div>
+  <div class="exportbar">
+    <button id="btnXlsx">Download trucking_plan.xlsx</button>
+    <button id="btnCsv">Download trucking_plan.csv</button>
+    <button id="btnTxt">Download trucking_layout.txt</button>
+  </div>
+</section>
+
+<footer>Panels ride flat, longer dimension along the truck length &middot; a row holds 1&ndash;3 panels end-to-end &middot; earlier-install panels always sit above later ones in the same truck &middot; trucks on site can be pulled from simultaneously; the oldest is dispatched when a new one is needed.</footer>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   Ported 1:1 from panel_calculator.py trucking section (greedy packer v1)
+   plus an optional per-truck payload (weight) limit.
+   ===================================================================== */
+
+// ---- parse_length_to_inches port ----
+function parseLen(text, def){
+  try{
+    let s = String(text==null?"":text).trim().replace(/\u2019/g,"'").replace(/\u201d/g,'"');
+    if(!s) return def;
+    s = s.replace(/\s+/g,"");
+    let feet=0, inches=0;
+    if(s.indexOf("'")>=0){
+      const i=s.indexOf("'");
+      const ft=s.slice(0,i), rest=s.slice(i+1).replace(/"/g,"");
+      feet = ft?parseFloat(ft):0;
+      inches = rest?parseFloat(rest):0;
+    }else{
+      inches = parseFloat(s.replace(/"/g,""));
+    }
+    if(isNaN(feet)||isNaN(inches)) return def;
+    return feet*12+inches;
+  }catch(e){ return def; }
+}
+// ---- _trk_fmt_ftin port ----
+function fmtFtIn(inches){
+  const ft=Math.floor(inches/12), rem=inches-ft*12;
+  const r=Math.round(rem*100)/100;
+  if(ft) return ft+"'-"+(+r.toFixed(2))+'"';
+  return (+(Math.round(inches*100)/100).toFixed(2))+'"';
+}
+function num(v){ const f=parseFloat(v); return isNaN(f)?0:f; }
+
+// ---------------------------------------------------------------- state
+let sheetHeaders=[], sheetRows=[], fileName="";
+const $=id=>document.getElementById(id);
+$("hdrDate").textContent = new Date().toISOString().slice(0,10);
+
+// ---------------------------------------------------------------- upload
+const drop=$("drop"), fi=$("fileinput");
+drop.addEventListener("click",()=>fi.click());
+drop.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" ")fi.click();});
+["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("drag");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("drag");}));
+drop.addEventListener("drop",e=>{ if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); });
+fi.addEventListener("change",()=>{ if(fi.files.length) handleFile(fi.files[0]); });
+
+function handleFile(f){
+  const err=$("fileerr"); err.className="msg err"; err.style.display="none";
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:"array"});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+      // first non-empty row = header
+      let hi=0; while(hi<aoa.length && aoa[hi].every(c=>String(c).trim()==="")) hi++;
+      if(hi>=aoa.length) throw new Error("Sheet appears to be empty.");
+      sheetHeaders=aoa[hi].map(h=>String(h).trim());
+      sheetRows=aoa.slice(hi+1).filter(r=>r.some(c=>String(c).trim()!==""));
+      if(!sheetRows.length) throw new Error("No data rows found under the header.");
+      fileName=f.name;
+      $("filechip").style.display="block";
+      $("filechip").innerHTML="Loaded <b>"+escapeHtml(f.name)+"</b> &mdash; "+sheetRows.length+" panels, "+sheetHeaders.length+" columns";
+      buildMapping();
+      $("mapping").style.display="block";
+      $("btnRun").disabled=false;
+    }catch(ex){
+      err.textContent="Could not read file: "+ex.message; err.style.display="block";
+      $("mapping").style.display="none"; $("btnRun").disabled=true;
+    }
+  };
+  reader.readAsArrayBuffer(f);
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+// ---------------------------------------------------------------- mapping
+const MAP_IDS=["col_order","col_name","col_size","col_w","col_h","col_wt","col_type","col_wall"];
+const AUTO={
+  col_order:[/install/i,/order/i,/seq/i,/^no\.?$/i,/^#$/],
+  col_name:[/name/i,/panel/i,/mark/i,/^id$/i],
+  col_size:[/^size$/i,/dimension/i,/dims/i],
+  col_w:[/width/i,/length/i,/^w(_|$)/i,/^l(_|$)/i],
+  col_h:[/height/i,/^h(_|$)/i],
+  col_wt:[/weight/i,/^wt/i,/lbs?/i,/mass/i],
+  col_type:[/type/i],
+  col_wall:[/wall/i,/facade/i,/elev/i]
+};
+function buildMapping(){
+  MAP_IDS.forEach(id=>{
+    const sel=$(id); sel.innerHTML="";
+    const none=document.createElement("option"); none.value=""; none.textContent="— not used —"; sel.appendChild(none);
+    sheetHeaders.forEach((h,i)=>{
+      const o=document.createElement("option"); o.value=String(i); o.textContent=h||("(column "+(i+1)+")"); sel.appendChild(o);
+    });
+    // auto-detect
+    const pats=AUTO[id]; let found="";
+    outer: for(const p of pats){ for(let i=0;i<sheetHeaders.length;i++){ if(p.test(sheetHeaders[i])){found=String(i);break outer;} } }
+    sel.value=found;
+  });
+  // if a combined size column matched, don't double-map width to the same col
+  if($("col_size").value && $("col_size").value===$("col_w").value) $("col_w").value="";
+  renderPreview();
+  MAP_IDS.forEach(id=>$(id).addEventListener("change",renderPreview));
+}
+function renderPreview(){
+  const pv=$("preview");
+  let html="<table><tr>"+sheetHeaders.map(h=>"<th>"+escapeHtml(h)+"</th>").join("")+"</tr>";
+  sheetRows.slice(0,8).forEach(r=>{
+    html+="<tr>"+sheetHeaders.map((_,i)=>"<td>"+escapeHtml(r[i]==null?"":r[i])+"</td>").join("")+"</tr>";
+  });
+  pv.innerHTML=html+"</table>";
+}
+
+// ---------------------------------------------------------------- settings
+function readSettings(){
+  const P=parseLen;
+  const st={
+    truck_length_in:     P($("s_len").value, 636),
+    truck_width_in:      P($("s_wid").value, 102),
+    max_stack_height_in: P($("s_stack").value, 102),
+    dunnage_height_in:   P($("s_dun").value, 4),
+    two_panel_gap_in:    P($("s_gap2").value, 6),
+    three_panel_gap_in:  P($("s_gap3").value, 15),
+    overhang_length_in:  P($("s_ovl").value, 0),
+    overhang_width_in:   P($("s_ovw").value, 0),
+    panel_thickness_in:  P($("s_thick").value, 6.625),
+    trucks_on_site:      Math.max(1, Math.floor(num($("s_count").value)||2)),
+    max_payload_lb:      Math.max(0, num($("s_payload").value))
+  };
+  const errs=[];
+  if(st.truck_length_in<=0) errs.push("Truck length must be > 0.");
+  if(st.truck_width_in<=0) errs.push("Truck width must be > 0.");
+  if(st.max_stack_height_in <= st.dunnage_height_in + st.panel_thickness_in)
+    errs.push("Max stack height must exceed dunnage + one panel thickness.");
+  return {st, errs};
+}
+$("btnSaveSet").addEventListener("click",()=>{
+  const raw={};
+  ["s_len","s_wid","s_stack","s_dun","s_gap2","s_gap3","s_ovl","s_ovw","s_thick","s_count","s_payload"]
+    .forEach(id=>raw[id]=$(id).value);
+  downloadText("trucking_settings.json", JSON.stringify(raw,null,2), "application/json");
+});
+$("btnLoadSet").addEventListener("click",()=>$("setinput").click());
+$("setinput").addEventListener("change",()=>{
+  const f=$("setinput").files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const raw=JSON.parse(e.target.result);
+      Object.keys(raw).forEach(k=>{ if($(k)) $(k).value=raw[k]; });
+    }catch(ex){ $("seterr").textContent="Could not read settings file: "+ex.message; $("seterr").style.display="block"; }
+  };
+  r.readAsText(f);
+});
+
+// ---------------------------------------------------------------- build panel rows from sheet
+function buildPanels(){
+  const gv=(row,selId)=>{ const v=$(selId).value; return v===""?"":row[parseInt(v,10)]; };
+  const errs=[];
+  if($("col_order").value==="") errs.push("Map the Install order column.");
+  if($("col_name").value==="") errs.push("Map the Panel name column.");
+  const hasSize=$("col_size").value!=="", hasWH=$("col_w").value!==""&&$("col_h").value!=="";
+  if(!hasSize && !hasWH) errs.push("Map either the combined Size column, or both Width and Height.");
+  if(errs.length) return {panels:null, errs};
+
+  const panels=[]; const warns=[];
+  sheetRows.forEach((row,ri)=>{
+    const name=String(gv(row,"col_name")).trim();
+    const ordRaw=gv(row,"col_order");
+    const ord=parseFloat(ordRaw);
+    let w=0,h=0;
+    if(hasSize){
+      const s=String(gv(row,"col_size")).trim();
+      const parts=s.split(/[xX\u00d7]/);
+      if(parts.length>=2){ w=parseLen(parts[0],0); h=parseLen(parts[1],0); }
+    }
+    if((!w||!h) && hasWH){ w=parseLen(gv(row,"col_w"),0); h=parseLen(gv(row,"col_h"),0); }
+    if(!name && !w && !h) return; // skip fully blank line
+    if(!w||!h){ warns.push("Row "+(ri+2)+" ("+(name||"?")+"): could not read size — skipped."); return; }
+    if(isNaN(ord)) warns.push("Row "+(ri+2)+" ("+(name||"?")+"): no install order — placed last.");
+    const wtRaw=gv(row,"col_wt");
+    const wt=(wtRaw===""||wtRaw==null)?null:parseFloat(wtRaw);
+    panels.push({
+      panel_name:name||("PANEL-"+(ri+1)),
+      panel_type:String(gv(row,"col_type")||"").trim(),
+      wall_id:String(gv(row,"col_wall")||"").trim(),
+      width_in:w, height_in:h,
+      weight_lb:(wt==null||isNaN(wt))?null:wt,
+      _ord:isNaN(ord)?Number.POSITIVE_INFINITY:ord, _row:ri
+    });
+  });
+  if(!panels.length) return {panels:null, errs:["No usable panel rows found."]};
+  panels.sort((a,b)=> a._ord-b._ord || a._row-b._row);
+  panels.forEach((p,i)=>p._install_seq=i+1);
+  return {panels, errs:[], warns};
+}
+
+// ---------------------------------------------------------------- _trk_pack_trucks port (+ payload limit)
+function packTrucks(seq, st){
+  const L_max=st.truck_length_in+st.overhang_length_in;
+  const W_max=st.truck_width_in+2*st.overhang_width_in;
+  const H_max=st.max_stack_height_in;
+  const dun=st.dunnage_height_in, gap2=st.two_panel_gap_in, gap3=st.three_panel_gap_in;
+  const thick=st.panel_thickness_in;
+  const K=Math.max(1,Math.floor(st.trucks_on_site));
+  const PAY=st.max_payload_lb;                    // 0 = ignore
+  const useWeight=PAY>0;
+
+  const layerLen=lay=>{
+    let t=lay.reduce((s,p)=>s+p._lay_len,0);
+    if(lay.length===2) t+=gap2; else if(lay.length===3) t+=2*gap3;
+    return t;
+  };
+  const wOf=p=>(p.weight_lb==null?0:p.weight_lb);
+  const fitsWeight=(t,p)=>!useWeight || (t.weight+wOf(p)<=PAY);
+
+  const trucks=[], open=[], oversize=[]; let nextNo=1;
+  const newTruck=()=>{ const t={no:nextNo++,layers:[],height:0,weight:0}; trucks.push(t); open.push(t); return t; };
+
+  for(const r of seq){
+    r._lay_len=Math.max(r.width_in,r.height_in);
+    r._lay_across=Math.min(r.width_in,r.height_in);
+    if(r._lay_across>W_max || r._lay_len>L_max){ r._truck="OVERSIZE"; oversize.push(r); continue; }
+    if(useWeight && wOf(r)>PAY){ r._truck="OVERSIZE"; r._wtOnly=true; oversize.push(r); continue; }
+
+    let placed=false;
+    // 1) extend the current (lowest, still-being-built) layer of an open truck
+    for(const t of open){
+      if(t.layers.length){
+        const lay=t.layers[t.layers.length-1];
+        if(lay.length<3 && layerLen(lay.concat([r]))<=L_max && fitsWeight(t,r)){
+          lay.push(r); t.weight+=wOf(r); placed=true; break;
+        }
+      }
+    }
+    // 2) start a new layer on an open truck
+    if(!placed){
+      for(const t of open){
+        if(t.height+dun+thick<=H_max && fitsWeight(t,r)){
+          t.layers.push([r]); t.height+=dun+thick; t.weight+=wOf(r); placed=true; break;
+        }
+      }
+    }
+    // 3) bring in a fresh truck (dispatch the oldest if K on site)
+    if(!placed){
+      if(open.length>=K) open.shift();
+      const t=newTruck();
+      t.layers.push([r]); t.height=dun+thick; t.weight=wOf(r);
+    }
+    for(const t of trucks){ for(const lay of t.layers){ if(lay.includes(r)){ r._truck=t.no; } } }
+  }
+  return {trucks, oversize, layerLen, L_max, W_max};
+}
+
+// ---------------------------------------------------------------- run
+let lastResult=null;
+$("btnRun").addEventListener("click",()=>{
+  $("seterr").style.display="none";
+  const {st,errs:sErr}=readSettings();
+  const {panels,errs:pErr,warns}=buildPanels();
+  const allErr=[...sErr,...pErr];
+  if(allErr.length){ $("seterr").textContent=allErr.join("  |  "); $("seterr").style.display="block"; window.scrollTo({top:$("seterr").offsetTop-120,behavior:"smooth"}); return; }
+
+  const res=packTrucks(panels, st);
+  // physical load order: bottom layer first
+  const loadOrder=new Map();
+  for(const t of res.trucks){
+    let order=1;
+    for(let li=t.layers.length-1; li>=0; li--)
+      for(const r of t.layers[li]) loadOrder.set(r, order++);
+  }
+  lastResult={st, seq:panels, ...res, loadOrder, warns:warns||[]};
+  renderResults(lastResult);
+});
+
+// ---------------------------------------------------------------- render
+function renderResults(R){
+  $("results").style.display="block";
+  const anyWeight=R.seq.some(p=>p.weight_lb!=null);
+  const loaded=R.seq.length-R.oversize.length;
+
+  // summary strip
+  let s="";
+  s+=cell(R.trucks.length,"total trucks needed","accent");
+  s+=cell(loaded+" / "+R.seq.length,"panels loaded");
+  s+=cell(R.oversize.length,"oversize / special transport", R.oversize.length?"bad":"");
+  s+=cell(R.trucks.reduce((m,t)=>Math.max(m,t.layers.length),0),"max layers on a truck");
+  if(anyWeight && R.st.max_payload_lb>0){
+    const hv=R.trucks.reduce((m,t)=>Math.max(m,t.weight),0);
+    s+=cell(Math.round(hv).toLocaleString()+" lb","heaviest truck");
+  }
+  $("sumstrip").innerHTML=s;
+  function cell(n,l,cls){return '<div class="sumcell"><div class="n '+(cls||"")+'">'+n+'</div><div class="l">'+l+'</div></div>';}
+
+  // warnings from parsing
+  if(R.warns.length){
+    $("sumstrip").insertAdjacentHTML("afterend",
+      '<div class="msg note" style="display:block;margin-bottom:22px">'+R.warns.map(escapeHtml).join("<br>")+'</div>');
+  }
+
+  // truck cards with SVG stacks
+  const tc=$("trucks"); tc.innerHTML="";
+  for(const t of R.trucks) tc.appendChild(truckCard(t,R));
+
+  // oversize box
+  const ob=$("oversizebox"); ob.innerHTML="";
+  if(R.oversize.length){
+    let h='<div class="msg err" style="display:block;margin-bottom:22px"><b>OVERSIZE — arrange special transport:</b><br>';
+    h+=R.oversize.map(p=>escapeHtml(p.panel_name)+" ("+fmtFtIn(p._lay_len)+" × "+fmtFtIn(p._lay_across)+") inst#"+p._install_seq+(p._wtOnly?" — exceeds payload":"")).join("<br>");
+    ob.innerHTML=h+"</div>";
+  }
+
+  // per-panel table
+  let th='<table><tr><th>Install #</th><th>Panel</th><th>Type</th><th>Wall</th><th>Width</th><th>Height</th>'+(anyWeight?'<th>Weight lb</th>':'')+'<th>Truck</th><th>Layer from top</th><th>Slot</th><th>Load order</th><th>Note</th></tr>';
+  for(const r of R.seq){
+    const tno=r._truck==null?"":r._truck;
+    let li="",slot="";
+    if(tno!=="OVERSIZE"&&tno!==""){
+      const t=R.trucks.find(t=>t.no===tno);
+      if(t){ t.layers.forEach((lay,i)=>{ const j=lay.indexOf(r); if(j>=0){li=i+1;slot=j+1;} }); }
+    }
+    const note=tno==="OVERSIZE"?(r._wtOnly?"exceeds payload — special transport":"exceeds truck envelope — special transport"):"";
+    th+="<tr><td>"+r._install_seq+"</td><td>"+escapeHtml(r.panel_name)+"</td><td>"+escapeHtml(r.panel_type)+"</td><td>"+escapeHtml(r.wall_id)+"</td>"
+      +"<td>"+fmtFtIn(r.width_in)+"</td><td>"+fmtFtIn(r.height_in)+"</td>"
+      +(anyWeight?"<td>"+(r.weight_lb==null?"—":Math.round(r.weight_lb).toLocaleString())+"</td>":"")
+      +"<td"+(tno==="OVERSIZE"?' class="oversize"':'')+">"+tno+"</td><td>"+li+"</td><td>"+slot+"</td><td>"+(R.loadOrder.get(r)||"")+"</td><td"+(note?' class="oversize"':'')+">"+note+"</td></tr>";
+  }
+  $("plantable").innerHTML=th+"</table>";
+  $("results").scrollIntoView({behavior:"smooth"});
+}
+
+// ---- SVG side-view stack for one truck ----
+function truckCard(t,R){
+  const st=R.st, L_max=R.L_max;
+  const nLay=t.layers.length, nP=t.layers.reduce((s,l)=>s+l.length,0);
+  const card=document.createElement("div"); card.className="truckcard";
+  const wt=(st.max_payload_lb>0 && t.weight>0)
+    ? ' &middot; payload <b>'+Math.round(t.weight).toLocaleString()+'</b> / '+Math.round(st.max_payload_lb).toLocaleString()+' lb':'';
+  card.innerHTML='<div class="thead"><span class="tno">TRUCK '+t.no+'</span>'
+    +'<span class="tmeta"><b>'+nLay+'</b> layer(s) &middot; <b>'+nP+'</b> panel(s) &middot; stack <b>'+fmtFtIn(t.height)+'</b> / '+fmtFtIn(st.max_stack_height_in)+wt+'</span></div>';
+
+  // geometry: draw bottom layer at bottom (layers[0] is TOP)
+  const VW=1100, padL=64, padR=150, padT=16, padB=34;
+  const rowH=40, dunH=6, gapY=4;
+  const innerW=VW-padL-padR;
+  const VH=padT+nLay*(rowH+dunH+gapY)+padB;
+  const sx=len=>len/L_max*innerW;
+
+  let svg='<svg viewBox="0 0 '+VW+' '+VH+'" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono,monospace">';
+  // deck line
+  const deckY=VH-padB;
+  svg+='<line x1="'+(padL-10)+'" y1="'+deckY+'" x2="'+(VW-padR+10)+'" y2="'+deckY+'" stroke="#191C21" stroke-width="3"/>';
+  svg+='<text x="'+(padL-10)+'" y="'+(deckY+18)+'" font-size="11" fill="#5B6472">DECK &mdash; usable row length '+fmtFtIn(L_max)+'</text>';
+
+  // layers drawn from bottom up: iterate reversed
+  for(let k=0;k<nLay;k++){
+    const li=nLay-1-k;               // index into t.layers, bottom first when k=0
+    const lay=t.layers[li];
+    const y=deckY-(k+1)*(rowH+dunH+gapY)+gapY;
+    const dy=y+rowH;                  // dunnage under this layer
+    // dunnage
+    svg+='<rect x="'+padL+'" y="'+dy+'" width="'+innerW+'" height="'+dunH+'" fill="#D8DBD4"/>';
+    // panels
+    let cx=padL;
+    lay.forEach((p,pi)=>{
+      const w=Math.max(sx(p._lay_len),46);
+      svg+='<rect x="'+cx+'" y="'+y+'" width="'+w+'" height="'+rowH+'" fill="#FDEEE3" stroke="#E8590C" stroke-width="1.5"/>';
+      svg+='<text x="'+(cx+w/2)+'" y="'+(y+16)+'" font-size="12" font-weight="600" text-anchor="middle" fill="#191C21">'+escapeHtml(p.panel_name)+'</text>';
+      svg+='<text x="'+(cx+w/2)+'" y="'+(y+31)+'" font-size="10.5" text-anchor="middle" fill="#5B6472">'+fmtFtIn(p._lay_len)+' &#215; '+fmtFtIn(p._lay_across)+' &middot; inst#'+p._install_seq+'</text>';
+      cx+=w;
+      if(pi<lay.length-1){
+        const g=sx(lay.length===2?R.st.two_panel_gap_in:R.st.three_panel_gap_in);
+        svg+='<rect x="'+cx+'" y="'+(y+rowH*0.35)+'" width="'+Math.max(g,3)+'" height="'+(rowH*0.3)+'" fill="none" stroke="#5B6472" stroke-dasharray="3,3"/>';
+        cx+=Math.max(g,3);
+      }
+    });
+    // labels right side
+    const used=R.layerLen(lay), pct=L_max?Math.round(100*used/L_max):0;
+    const tag=(li===0?"TOP":(li===nLay-1?"BOTTOM":""));
+    svg+='<text x="'+(VW-padR+12)+'" y="'+(y+15)+'" font-size="11" fill="#191C21" font-weight="600">L'+(li+1)+(tag?' &middot; '+tag:'')+'</text>';
+    svg+='<text x="'+(VW-padR+12)+'" y="'+(y+30)+'" font-size="10.5" fill="#5B6472">'+fmtFtIn(used)+' &middot; '+pct+'%</text>';
+    // left: physical load order of this layer (bottom = loaded first)
+    svg+='<text x="'+(padL-14)+'" y="'+(y+rowH/2+4)+'" font-size="10.5" fill="#5B6472" text-anchor="end">load '+(k+1)+'</text>';
+  }
+  svg+='</svg>';
+  card.insertAdjacentHTML("beforeend",svg);
+  card.insertAdjacentHTML("beforeend",'<div class="tfoot">Load order: Layer '+nLay+' (BOTTOM) first &rarr; Layer 1 (TOP) last. Install order runs top-down.</div>');
+  return card;
+}
+
+// ---------------------------------------------------------------- exports
+function downloadText(name, text, mime){
+  const blob=new Blob([text],{type:mime||"text/plain"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+function planRows(R){
+  const anyWeight=R.seq.some(p=>p.weight_lb!=null);
+  const head=["install_seq","panel_name","panel_type","wall_id","width_in","height_in"];
+  if(anyWeight) head.push("weight_lb");
+  head.push("truck_no","layer_from_top","slot_in_layer","truck_load_order","note");
+  const rows=[head];
+  for(const r of R.seq){
+    const tno=r._truck==null?"":r._truck;
+    let li="",slot="";
+    if(tno!=="OVERSIZE"&&tno!==""){
+      const t=R.trucks.find(t=>t.no===tno);
+      if(t){ t.layers.forEach((lay,i)=>{ const j=lay.indexOf(r); if(j>=0){li=i+1;slot=j+1;} }); }
+    }
+    const note=tno==="OVERSIZE"?(r._wtOnly?"exceeds payload -- special transport":"exceeds truck envelope -- special transport"):"";
+    const row=[r._install_seq,r.panel_name,r.panel_type,r.wall_id,r.width_in,r.height_in];
+    if(anyWeight) row.push(r.weight_lb==null?"":r.weight_lb);
+    row.push(tno,li,slot,R.loadOrder.get(r)||"",note);
+    rows.push(row);
+  }
+  return rows;
+}
+$("btnCsv").addEventListener("click",()=>{
+  if(!lastResult)return;
+  const csv=planRows(lastResult).map(r=>r.map(c=>{
+    const s=String(c==null?"":c);
+    return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
+  }).join(",")).join("\n");
+  downloadText("trucking_plan.csv",csv,"text/csv");
+});
+$("btnXlsx").addEventListener("click",()=>{
+  if(!lastResult)return;
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(planRows(lastResult)), "trucking_plan");
+  // second sheet: per-truck summary
+  const sum=[["truck_no","layers","panels","stack_height_in","payload_lb"]];
+  for(const t of lastResult.trucks)
+    sum.push([t.no,t.layers.length,t.layers.reduce((s,l)=>s+l.length,0),Math.round(t.height*100)/100,Math.round(t.weight)]);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sum), "truck_summary");
+  XLSX.writeFile(wb,"trucking_plan.xlsx");
+});
+$("btnTxt").addEventListener("click",()=>{
+  if(!lastResult)return;
+  downloadText("trucking_layout.txt", layoutTxt(lastResult));
+});
+
+// ---- _trk_write_layout_txt port ----
+function layoutTxt(R){
+  const st=R.st, L_max=R.L_max;
+  const lines=[];
+  const bar="=".repeat(78), dash="-".repeat(78);
+  lines.push(bar,"TRUCKING PLAN",bar);
+  lines.push("TOTAL TRUCKS NEEDED: "+R.trucks.length);
+  if(R.oversize.length) lines.push("OVERSIZE (special transport, not on trucks): "+R.oversize.length+" panel(s)");
+  lines.push("Panels loaded: "+(R.seq.length-R.oversize.length)+" of "+R.seq.length);
+  lines.push("");
+  lines.push("Settings: truck "+fmtFtIn(st.truck_length_in)+" x "+fmtFtIn(st.truck_width_in)
+    +" | max stack "+fmtFtIn(st.max_stack_height_in)+" | dunnage "+fmtFtIn(st.dunnage_height_in)
+    +" | gaps 2-up "+fmtFtIn(st.two_panel_gap_in)+" / 3-up "+fmtFtIn(st.three_panel_gap_in)
+    +" | overhang L "+fmtFtIn(st.overhang_length_in)+" / W "+fmtFtIn(st.overhang_width_in)+" per side"
+    +" | panel thickness "+fmtFtIn(st.panel_thickness_in)
+    +(st.max_payload_lb>0?" | max payload "+Math.round(st.max_payload_lb)+" lb":""));
+  lines.push("Sequence: install order from spreadsheet (column-mapped).");
+  lines.push("Rule: install order runs TOP-DOWN in each stack; physical loading is the reverse (bottom layer first).");
+  lines.push("");
+  for(const t of R.trucks){
+    const nP=t.layers.reduce((s,l)=>s+l.length,0), nLay=t.layers.length;
+    lines.push(dash);
+    lines.push("TRUCK "+t.no+"   ("+nLay+" layer(s), "+nP+" panel(s), stack height "
+      +fmtFtIn(t.height)+" / "+fmtFtIn(st.max_stack_height_in)
+      +(st.max_payload_lb>0&&t.weight>0?", payload "+Math.round(t.weight)+" lb":"")+")");
+    t.layers.forEach((lay,li)=>{
+      const tag=li===0?"TOP   ":(li===nLay-1?"BOTTOM":"      ");
+      const cells=lay.map(p=>p.panel_name+" ("+fmtFtIn(p._lay_len)+" x "+fmtFtIn(p._lay_across)+") inst#"+p._install_seq).join("  |  ");
+      const used=R.layerLen(lay);
+      lines.push("  Layer "+String(li+1).padStart(2)+" "+tag+" : "+cells);
+      lines.push("             row length "+fmtFtIn(used)+" / "+fmtFtIn(L_max)
+        +"  ("+(L_max?Math.round(100*used/L_max):0)+"% used)");
+    });
+    lines.push("  Load order: Layer "+nLay+" (BOTTOM) first -> Layer 1 (TOP) last.");
+  }
+  if(R.oversize.length){
+    lines.push(dash);
+    lines.push("OVERSIZE PANELS (exceed truck envelope; arrange special transport):");
+    for(const p of R.oversize)
+      lines.push("  "+p.panel_name+"  ("+fmtFtIn(p._lay_len)+" x "+fmtFtIn(p._lay_across)+")  inst#"+p._install_seq+(p._wtOnly?"  [payload]":""));
+  }
+  lines.push(bar);
+  return lines.join("\n")+"\n";
+}
+</script>
+</body>
+</html>
