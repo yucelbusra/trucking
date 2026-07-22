@@ -133,7 +133,7 @@ footer{margin-top:48px;font-family:var(--mono);font-size:11px;color:var(--steel)
     <h1>Panel <span>Trucking</span> Planner</h1>
     <p>load manifest generator &mdash; install-order stacking, greedy packer v1</p>
   </div>
-  <div class="manifest-no">standalone port of pyRevit trucking module<b>v8 &mdash; height-checked &middot; permits</b><b id="hdrDate"></b></div>
+  <div class="manifest-no">standalone port of pyRevit trucking module<b>v9 &mdash; fraction-safe parser</b><b id="hdrDate"></b></div>
 </header>
 
 <!-- STEP 1 -->
@@ -244,21 +244,35 @@ footer{margin-top:48px;font-family:var(--mono);font-size:11px;color:var(--steel)
    plus an optional per-truck payload (weight) limit.
    ===================================================================== */
 
-// ---- parse_length_to_inches port ----
+// ---- length parser: feet-inches incl. hyphen separators & fractions ----
+// Accepts: 53'   8'6"   8' - 6"   8'-6"   7' - 9 1/4"   25' - 5 7/16"
+//          5 3/8"   13/16"   6.625"   102   0
+function parseInchPart(str){
+  str=str.trim();
+  if(str==="") return 0;
+  let m=str.match(/^(\d+(?:\.\d+)?)\s+(\d+)\s*\/\s*(\d+)$/);   // "9 1/4"
+  if(m) return parseFloat(m[1]) + (+m[2])/(+m[3]||1);
+  m=str.match(/^(\d+)\s*\/\s*(\d+)$/);                             // "13/16"
+  if(m) return (+m[1])/(+m[2]||1);
+  m=str.match(/^\d+(?:\.\d+)?$/);                                    // "6.625"
+  if(m) return parseFloat(str);
+  return NaN;
+}
 function parseLen(text, def){
   try{
-    let s = String(text==null?"":text).trim().replace(/\u2019/g,"'").replace(/\u201d/g,'"');
+    let s=String(text==null?"":text).trim()
+      .replace(/[\u2019\u2032]/g,"'").replace(/[\u201d\u2033]/g,'"');
     if(!s) return def;
-    s = s.replace(/\s+/g,"");
-    let feet=0, inches=0;
-    if(s.indexOf("'")>=0){
-      const i=s.indexOf("'");
-      const ft=s.slice(0,i), rest=s.slice(i+1).replace(/"/g,"");
-      feet = ft?parseFloat(ft):0;
-      inches = rest?parseFloat(rest):0;
-    }else{
-      inches = parseFloat(s.replace(/"/g,""));
+    let feet=0, inPart=s;
+    const i=s.indexOf("'");
+    if(i>=0){
+      const ft=s.slice(0,i).trim();
+      feet=ft?parseFloat(ft):0;
+      inPart=s.slice(i+1);
     }
+    // strip the inch mark and any leading separator ("-", en dash, spaces)
+    inPart=inPart.replace(/"/g,"").replace(/^[\s\-\u2013\u2014]+/,"").trim();
+    const inches=parseInchPart(inPart);
     if(isNaN(feet)||isNaN(inches)) return def;
     return feet*12+inches;
   }catch(e){ return def; }
