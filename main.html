@@ -165,15 +165,17 @@ footer{margin-top:48px;font-family:var(--mono);font-size:11px;color:var(--steel)
       <div class="sgroup">Truck envelope</div>
       <div class="field"><label>Truck length <span class="unit">ft-in</span></label><input type="text" id="s_len" value="53'"></div>
       <div class="field"><label>Truck width <span class="unit">ft-in</span></label><input type="text" id="s_wid" value="8'6&quot;"></div>
-      <div class="field"><label>Allowed overhang &mdash; length <span class="unit">ft-in</span></label><input type="text" id="s_ovl" value="0"></div>
+      <div class="field"><label>Allowed overhang &mdash; front <span class="unit">ft-in</span></label><input type="text" id="s_ovf" value="0"></div>
+      <div class="field"><label>Allowed overhang &mdash; back <span class="unit">ft-in</span></label><input type="text" id="s_ovb" value="0"></div>
       <div class="field"><label>Allowed overhang &mdash; width, per side <span class="unit">ft-in</span></label><input type="text" id="s_ovw" value="0"></div>
 
       <div class="sgroup">Stacking</div>
       <div class="field"><label>Max stack height <span class="unit">ft-in</span></label><input type="text" id="s_stack" value="8'6&quot;"></div>
       <div class="field"><label>Dunnage height <span class="unit">ft-in</span></label><input type="text" id="s_dun" value="4&quot;"></div>
       <div class="field"><label>Panel thickness <span class="unit">ft-in</span></label><input type="text" id="s_thick" value="6.625&quot;"></div>
-      <div class="field"><label>Gap between 2 panels in a row <span class="unit">ft-in</span></label><input type="text" id="s_gap2" value="6&quot;"></div>
-      <div class="field"><label>Gap between 3 panels in a row <span class="unit">ft-in</span></label><input type="text" id="s_gap3" value="1'3&quot;"></div>
+      <div class="field"><label>Gap between 2 panels in a row <span class="unit">ft-in &mdash; used before the LAST panel</span></label><input type="text" id="s_gap2" value="6&quot;"></div>
+      <div class="field"><label>Gap between 2+ panels in a row <span class="unit">ft-in &mdash; all other gaps</span></label><input type="text" id="s_gapm" value="1'3&quot;"></div>
+      <div class="field"><label>Max panels per row <span class="unit">count</span></label><input type="number" id="s_maxrow" value="3" min="1" step="1"></div>
 
       <div class="sgroup">Logistics</div>
       <div class="field"><label>Trucks on site at once <span class="unit">count</span></label><input type="number" id="s_count" value="2" min="1" step="1"></div>
@@ -205,7 +207,7 @@ footer{margin-top:48px;font-family:var(--mono);font-size:11px;color:var(--steel)
   </div>
 </section>
 
-<footer>Panels ride flat, longer dimension along the truck length &middot; a row holds 1&ndash;3 panels end-to-end &middot; earlier-install panels always sit above later ones in the same truck &middot; trucks on site can be pulled from simultaneously; the oldest is dispatched when a new one is needed.</footer>
+<footer>Panels ride flat, longer dimension along the truck length &middot; a row holds panels end-to-end up to the max-per-row cap &middot; the gap before the last panel in a row uses the "2 panels" value; every other gap uses the "2+ panels" value &middot; earlier-install panels always sit above later ones in the same truck &middot; trucks on site can be pulled from simultaneously; the oldest is dispatched when a new one is needed.</footer>
 </div>
 
 <script>
@@ -333,9 +335,11 @@ function readSettings(){
     max_stack_height_in: P($("s_stack").value, 102),
     dunnage_height_in:   P($("s_dun").value, 4),
     two_panel_gap_in:    P($("s_gap2").value, 6),
-    three_panel_gap_in:  P($("s_gap3").value, 15),
-    overhang_length_in:  P($("s_ovl").value, 0),
+    multi_panel_gap_in:  P($("s_gapm").value, 15),
+    overhang_front_in:   P($("s_ovf").value, 0),
+    overhang_back_in:    P($("s_ovb").value, 0),
     overhang_width_in:   P($("s_ovw").value, 0),
+    max_per_row:         Math.max(1, Math.floor(num($("s_maxrow").value)||3)),
     panel_thickness_in:  P($("s_thick").value, 6.625),
     trucks_on_site:      Math.max(1, Math.floor(num($("s_count").value)||2)),
     max_payload_lb:      Math.max(0, num($("s_payload").value))
@@ -349,7 +353,7 @@ function readSettings(){
 }
 $("btnSaveSet").addEventListener("click",()=>{
   const raw={};
-  ["s_len","s_wid","s_stack","s_dun","s_gap2","s_gap3","s_ovl","s_ovw","s_thick","s_count","s_payload"]
+  ["s_len","s_wid","s_stack","s_dun","s_gap2","s_gapm","s_ovf","s_ovb","s_ovw","s_thick","s_count","s_payload","s_maxrow"]
     .forEach(id=>raw[id]=$(id).value);
   downloadText("trucking_settings.json", JSON.stringify(raw,null,2), "application/json");
 });
@@ -360,6 +364,8 @@ $("setinput").addEventListener("change",()=>{
   r.onload=e=>{
     try{
       const raw=JSON.parse(e.target.result);
+      if(raw.s_ovl!=null && raw.s_ovf==null){ raw.s_ovf=raw.s_ovl; raw.s_ovb="0"; }  // legacy single length overhang
+      if(raw.s_gap3!=null && raw.s_gapm==null){ raw.s_gapm=raw.s_gap3; }             // legacy 3-panel gap
       Object.keys(raw).forEach(k=>{ if($(k)) $(k).value=raw[k]; });
     }catch(ex){ $("seterr").textContent="Could not read settings file: "+ex.message; $("seterr").style.display="block"; }
   };
@@ -410,18 +416,22 @@ function buildPanels(){
 
 // ---------------------------------------------------------------- _trk_pack_trucks port (+ payload limit)
 function packTrucks(seq, st){
-  const L_max=st.truck_length_in+st.overhang_length_in;
+  const L_max=st.truck_length_in+st.overhang_front_in+st.overhang_back_in;
   const W_max=st.truck_width_in+2*st.overhang_width_in;
   const H_max=st.max_stack_height_in;
-  const dun=st.dunnage_height_in, gap2=st.two_panel_gap_in, gap3=st.three_panel_gap_in;
+  const dun=st.dunnage_height_in, gap2=st.two_panel_gap_in, gapM=st.multi_panel_gap_in;
   const thick=st.panel_thickness_in;
+  const maxN=Math.max(1,Math.floor(st.max_per_row||3));
   const K=Math.max(1,Math.floor(st.trucks_on_site));
   const PAY=st.max_payload_lb;                    // 0 = ignore
   const useWeight=PAY>0;
 
+  // Gap rule: with n panels there are n-1 gaps. The gap BEFORE the LAST panel
+  // is always gap2; every other gap is gapM.  n=2 -> gap2 only.
   const layerLen=lay=>{
+    const n=lay.length;
     let t=lay.reduce((s,p)=>s+p._lay_len,0);
-    if(lay.length===2) t+=gap2; else if(lay.length===3) t+=2*gap3;
+    if(n>=2) t+=gap2+(n-2)*gapM;
     return t;
   };
   const wOf=p=>(p.weight_lb==null?0:p.weight_lb);
@@ -441,7 +451,7 @@ function packTrucks(seq, st){
     for(const t of open){
       if(t.layers.length){
         const lay=t.layers[t.layers.length-1];
-        if(lay.length<3 && layerLen(lay.concat([r]))<=L_max && fitsWeight(t,r)){
+        if(lay.length<maxN && layerLen(lay.concat([r]))<=L_max && fitsWeight(t,r)){
           lay.push(r); t.weight+=wOf(r); placed=true; break;
         }
       }
@@ -582,7 +592,7 @@ function truckCard(t,R){
       svg+='<text x="'+(cx+w/2)+'" y="'+(y+31)+'" font-size="10.5" text-anchor="middle" fill="#5B6472">'+fmtFtIn(p._lay_len)+' &#215; '+fmtFtIn(p._lay_across)+' &middot; inst#'+p._install_seq+'</text>';
       cx+=w;
       if(pi<lay.length-1){
-        const g=sx(lay.length===2?R.st.two_panel_gap_in:R.st.three_panel_gap_in);
+        const g=sx(pi===lay.length-2?R.st.two_panel_gap_in:R.st.multi_panel_gap_in);
         svg+='<rect x="'+cx+'" y="'+(y+rowH*0.35)+'" width="'+Math.max(g,3)+'" height="'+(rowH*0.3)+'" fill="none" stroke="#5B6472" stroke-dasharray="3,3"/>';
         cx+=Math.max(g,3);
       }
@@ -665,8 +675,9 @@ function layoutTxt(R){
   lines.push("");
   lines.push("Settings: truck "+fmtFtIn(st.truck_length_in)+" x "+fmtFtIn(st.truck_width_in)
     +" | max stack "+fmtFtIn(st.max_stack_height_in)+" | dunnage "+fmtFtIn(st.dunnage_height_in)
-    +" | gaps 2-up "+fmtFtIn(st.two_panel_gap_in)+" / 3-up "+fmtFtIn(st.three_panel_gap_in)
-    +" | overhang L "+fmtFtIn(st.overhang_length_in)+" / W "+fmtFtIn(st.overhang_width_in)+" per side"
+    +" | gap before last panel "+fmtFtIn(st.two_panel_gap_in)+" / other gaps "+fmtFtIn(st.multi_panel_gap_in)
+    +" | max "+Math.floor(st.max_per_row||3)+" per row"
+    +" | overhang front "+fmtFtIn(st.overhang_front_in)+" / back "+fmtFtIn(st.overhang_back_in)+" / W "+fmtFtIn(st.overhang_width_in)+" per side"
     +" | panel thickness "+fmtFtIn(st.panel_thickness_in)
     +(st.max_payload_lb>0?" | max payload "+Math.round(st.max_payload_lb)+" lb":""));
   lines.push("Sequence: install order from spreadsheet (column-mapped).");
