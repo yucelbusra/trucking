@@ -71,6 +71,14 @@ select:focus,input:focus{outline:2px solid var(--hivis);outline-offset:-1px}
 .field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px}
 .field .unit{font-family:var(--mono);font-size:11px;color:var(--steel);font-weight:400}
 .settings-actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}
+.invtable{border:1px solid var(--line);overflow-x:auto}
+.invtable table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12.5px;min-width:860px}
+.invtable th{background:var(--ink);color:var(--paper);text-align:left;padding:7px 10px;font-weight:600;white-space:nowrap}
+.invtable td{padding:5px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.invtable input[type=text],.invtable input[type=number]{width:92px;padding:5px 7px}
+.invtable input.iname{width:150px}
+.invtable input[type=checkbox]{width:16px;height:16px;accent-color:var(--hivis)}
+.invtable .del{cursor:pointer;color:var(--warn);font-weight:700;border:none;background:none;padding:2px 8px;font-size:14px}
 
 /* ---------- buttons ---------- */
 button{font-family:var(--sans);font-weight:700;font-size:14px;letter-spacing:.03em;text-transform:uppercase;padding:11px 22px;border:1px solid var(--ink);background:#fff;color:var(--ink);cursor:pointer;border-radius:0;transition:background .12s,color .12s}
@@ -125,7 +133,7 @@ footer{margin-top:48px;font-family:var(--mono);font-size:11px;color:var(--steel)
     <h1>Panel <span>Trucking</span> Planner</h1>
     <p>load manifest generator &mdash; install-order stacking, greedy packer v1</p>
   </div>
-  <div class="manifest-no">standalone port of pyRevit trucking module<b>v5 &mdash; scheduled &middot; beam-packed</b><b id="hdrDate"></b></div>
+  <div class="manifest-no">standalone port of pyRevit trucking module<b>v8 &mdash; height-checked &middot; permits</b><b id="hdrDate"></b></div>
 </header>
 
 <!-- STEP 1 -->
@@ -157,20 +165,35 @@ footer{margin-top:48px;font-family:var(--mono);font-size:11px;color:var(--steel)
   </div>
 </section>
 
-<!-- STEP 2 -->
+<!-- STEP 2 : TRUCK INVENTORY -->
 <section class="step">
-  <div class="step-head"><span class="step-tag">STEP 2</span><h2>Trucking limits</h2><span class="hint">lengths accept 53' &middot; 8'6" &middot; plain inches</span></div>
+  <div class="step-head"><span class="step-tag">STEP 2</span><h2>Truck inventory</h2><span class="hint">check the trucks the planner may use</span></div>
+  <div class="step-body">
+    <div class="sgroup" style="margin-top:0">In-house trucks</div>
+    <div class="invtable" id="inhouseTable"></div>
+    <div style="margin-top:12px"><button class="small" id="btnAddInhouse">+ Add in-house truck</button></div>
+
+    <div class="sgroup" style="margin-top:22px">Rental truck options <span style="text-transform:none;letter-spacing:0">&mdash; the plan reports how many units of each are needed</span></div>
+    <div class="invtable" id="rentalTable"></div>
+    <div style="margin-top:12px"><button class="small" id="btnAddRental">+ Add rental option</button></div>
+
+    <div class="settings-grid" style="margin-top:22px">
+      <div class="field"><label>Fleet priority <span class="unit">which trucks may be used</span></label>
+        <select id="s_fleet"><option value="mixed">Mixed &mdash; in-house preferred, rent when it helps</option><option value="inhouse">In-house only</option><option value="rental">Rental only</option></select></div>
+      <div class="field"><label>Load width policy <span class="unit">permit tiers &mdash; panels ride flat</span></label>
+        <select id="s_wpolicy"><option value="none">No permit &mdash; up to 8'6"</option><option value="permit">Permit &mdash; up to 12'</option><option value="escort">Escort &mdash; up to bed + side overhangs</option></select></div>
+      <div class="field"><label>Max legal load height <span class="unit">ft-in &mdash; stack = this minus deck</span></label><input type="text" id="s_legalh" value="13'6&quot;"></div>
+    </div>
+    <div class="msg err" id="fleeterr"></div>
+  </div>
+</section>
+
+<!-- STEP 3 -->
+<section class="step">
+  <div class="step-head"><span class="step-tag">STEP 3</span><h2>Stacking &amp; logistics</h2><span class="hint">lengths accept 53' &middot; 8'6" &middot; plain inches</span></div>
   <div class="step-body">
     <div class="settings-grid">
-      <div class="sgroup">Truck envelope</div>
-      <div class="field"><label>Truck length <span class="unit">ft-in</span></label><input type="text" id="s_len" value="53'"></div>
-      <div class="field"><label>Truck width <span class="unit">ft-in</span></label><input type="text" id="s_wid" value="8'6&quot;"></div>
-      <div class="field"><label>Allowed overhang &mdash; front <span class="unit">ft-in</span></label><input type="text" id="s_ovf" value="0"></div>
-      <div class="field"><label>Allowed overhang &mdash; back <span class="unit">ft-in</span></label><input type="text" id="s_ovb" value="0"></div>
-      <div class="field"><label>Allowed overhang &mdash; width, per side <span class="unit">ft-in</span></label><input type="text" id="s_ovw" value="0"></div>
-
       <div class="sgroup">Stacking</div>
-      <div class="field"><label>Max stack height <span class="unit">ft-in</span></label><input type="text" id="s_stack" value="8'6&quot;"></div>
       <div class="field"><label>Dunnage height <span class="unit">ft-in</span></label><input type="text" id="s_dun" value="4&quot;"></div>
       <div class="field"><label>Panel thickness <span class="unit">ft-in</span></label><input type="text" id="s_thick" value="6.625&quot;"></div>
       <div class="field"><label>Gap between 2 panels in a row <span class="unit">ft-in &mdash; used before the LAST panel</span></label><input type="text" id="s_gap2" value="6&quot;"></div>
@@ -330,19 +353,134 @@ function renderPreview(){
   pv.innerHTML=html+"</table>";
 }
 
+
+// ================================================================
+// TRUCK INVENTORY  (both tables are editable; defaults embedded below)
+// "Deck height" = trailer deck above ground; usable stack height is
+// computed as (max legal load height) - (deck height).
+// Width is governed by the load-width policy (permit tiers), capped by
+// bed width (8'6") + side overhangs.
+// ================================================================
+const BED_WIDTH_IN=102;   // standard trailer bed width 8'6"
+const ftin=t=>parseLen(t,0);
+
+let inhouseRows=[
+  {use:true,name:"Inhouse 40",  deck:"3'", len:"40'", pay:"16000", ovf:"0",  ovb:"3'", ovw:"3'6\""},
+  {use:true,name:"Inhouse 32-1",deck:"3'", len:"32'", pay:"16000", ovf:"0",  ovb:"3'", ovw:"3'6\""},
+  {use:true,name:"Inhouse 32-2",deck:"3'", len:"32'", pay:"16000", ovf:"0",  ovb:"3'", ovw:"3'6\""}
+];
+let rentalRows=[
+  {use:true,name:"Rental 53",   deck:"5'", len:"53'", pay:"44000", ovf:"3'", ovb:"4'", ovw:"3'6\""}
+];
+
+function stackInfo(deckTxt){
+  const legal=parseLen($("s_legalh").value,162);
+  const dun=parseLen($("s_dun").value,4), thick=parseLen($("s_thick").value,6.625);
+  const H=legal-parseLen(deckTxt,0);
+  const per=dun+thick;
+  const layers=per>0?Math.max(0,Math.floor(H/per)):0;
+  return {H, layers, bad:H<=per};
+}
+function invRowHtml(r,i,cls){
+  return "<tr><td><input type='checkbox' class='"+cls+"_use' data-i='"+i+"' "+(r.use?"checked":"")+"></td>"
+    +"<td><input type='text' class='iname "+cls+"_f' data-i='"+i+"' data-f='name' value='"+escapeHtml(r.name)+"'></td>"
+    +"<td><input type='text' class='"+cls+"_f' data-i='"+i+"' data-f='deck' value='"+escapeHtml(r.deck)+"'></td>"
+    +"<td><input type='text' class='"+cls+"_f' data-i='"+i+"' data-f='len' value='"+escapeHtml(r.len)+"'></td>"
+    +"<td><input type='number' class='"+cls+"_f' data-i='"+i+"' data-f='pay' value='"+escapeHtml(r.pay)+"' step='100' min='0'></td>"
+    +"<td><input type='text' class='"+cls+"_f' data-i='"+i+"' data-f='ovf' value='"+escapeHtml(r.ovf)+"'></td>"
+    +"<td><input type='text' class='"+cls+"_f' data-i='"+i+"' data-f='ovb' value='"+escapeHtml(r.ovb)+"'></td>"
+    +"<td><input type='text' class='"+cls+"_f' data-i='"+i+"' data-f='ovw' value='"+escapeHtml(r.ovw)+"'></td>"
+    +(function(){const si=stackInfo(r.deck);
+      return "<td style='color:"+(si.bad?"var(--warn)":"var(--steel)")+"'>"+fmtFtIn(Math.max(0,si.H))+" &rarr; "+si.layers+" layer"+(si.layers===1?"":"s")+(si.bad?" &#9888;":"")+"</td>";})()
+    +"<td><button class='del "+cls+"_del' data-i='"+i+"' title='remove'>&times;</button></td></tr>";
+}
+const INV_HEAD="<tr><th>Use</th><th>Name</th><th>Deck height</th><th>Length</th><th>Payload lb</th><th>Ovh front</th><th>Ovh back</th><th>Ovh side (each)</th><th>Max stack &rarr; layers</th><th></th></tr>";
+function wireInv(cls,rows,rerender){
+  document.querySelectorAll("."+cls+"_f").forEach(el=>el.addEventListener("change",e=>{
+    rows[+e.target.dataset.i][e.target.dataset.f]=e.target.value;
+  }));
+  document.querySelectorAll("."+cls+"_use").forEach(el=>el.addEventListener("change",e=>{
+    rows[+e.target.dataset.i].use=e.target.checked;
+  }));
+  document.querySelectorAll("."+cls+"_del").forEach(el=>el.addEventListener("click",e=>{
+    rows.splice(+e.target.dataset.i,1); rerender();
+  }));
+}
+function renderInhouse(){
+  $("inhouseTable").innerHTML="<table>"+INV_HEAD+inhouseRows.map((r,i)=>invRowHtml(r,i,"ih")).join("")+"</table>";
+  wireInv("ih",inhouseRows,renderInhouse);
+}
+function renderRentals(){
+  $("rentalTable").innerHTML="<table>"+INV_HEAD+rentalRows.map((r,i)=>invRowHtml(r,i,"rt")).join("")+"</table>";
+  wireInv("rt",rentalRows,renderRentals);
+}
+$("btnAddInhouse").addEventListener("click",()=>{
+  inhouseRows.push({use:true,name:"Inhouse "+(inhouseRows.length+1),deck:"3'",len:"40'",pay:"16000",ovf:"0",ovb:"3'",ovw:"3'6\""});
+  renderInhouse();
+});
+$("btnAddRental").addEventListener("click",()=>{
+  rentalRows.push({use:true,name:"Rental "+(rentalRows.length+1),deck:"5'",len:"53'",pay:"44000",ovf:"3'",ovb:"4'",ovw:"3'6\""});
+  renderRentals();
+});
+renderInhouse(); renderRentals();
+["s_legalh","s_dun","s_thick"].forEach(id=>$(id).addEventListener("change",()=>{renderInhouse();renderRentals();}));
+
+// width policy cap in inches
+function widthPolicyCap(){
+  const v=$("s_wpolicy").value;
+  return v==="none"?102 : v==="permit"?144 : Infinity;
+}
+
+// build the active fleet (truck TYPES); identical in-house rows group into one type with qty
+function buildFleet(){
+  const mode=$("s_fleet").value;
+  const legalH=parseLen($("s_legalh").value, 162);
+  const cap=widthPolicyCap();
+  const fleet=[]; const errs=[];
+  const dun=parseLen($("s_dun").value,4), thick=parseLen($("s_thick").value,6.625);
+  const mk=(r,i,kind)=>{
+    const L=parseLen(r.len,0), D=parseLen(r.deck,0);
+    const H=legalH-D;
+    if(L<=0){ errs.push((kind==="inhouse"?"In-house":"Rental")+" \""+r.name+"\": length must be > 0."); return null; }
+    if(H<=dun+thick){ errs.push("\""+r.name+"\": deck "+fmtFtIn(D)+" leaves only "+fmtFtIn(Math.max(0,H))+" under the "+fmtFtIn(legalH)+" legal height — not enough for dunnage + one panel."); return null; }
+    const ovw=parseLen(r.ovw,0);
+    return {name:r.name||(kind+" "+(i+1)), kind, qty:1, deck:D,
+      L_max:L+parseLen(r.ovf,0)+parseLen(r.ovb,0),
+      W_max:Math.min(cap, BED_WIDTH_IN+2*ovw),
+      H_max:H, payload:Math.max(0,parseFloat(r.pay)||0)};
+  };
+  if(mode!=="rental"){
+    // group identical in-house specs into one type with qty
+    const groups=new Map();
+    inhouseRows.forEach((r,i)=>{
+      if(!r.use) return;
+      const t=mk(r,i,"inhouse"); if(!t) return;
+      const key=[t.L_max,t.W_max,t.H_max,t.deck,t.payload].join("_");
+      if(groups.has(key)){ const g=groups.get(key); g.qty++; g.name+=" / "+t.name; }
+      else groups.set(key,t);
+    });
+    let gi=0;
+    for(const g of groups.values()){ g.id="ih"+(gi++); fleet.push(g); }
+  }
+  if(mode!=="inhouse"){
+    rentalRows.forEach((r,i)=>{
+      if(!r.use) return;
+      const t=mk(r,i,"rental"); if(!t) return;
+      t.id="rt"+i; t.qty=Infinity; fleet.push(t);
+    });
+  }
+  if(!fleet.length&&!errs.length) errs.push(mode==="inhouse"?"No in-house trucks checked.":mode==="rental"?"No rental options checked.":"No trucks checked in the inventory.");
+  return {fleet, errs};
+}
+
 // ---------------------------------------------------------------- settings
 function readSettings(){
   const P=parseLen;
   const st={
-    truck_length_in:     P($("s_len").value, 636),
-    truck_width_in:      P($("s_wid").value, 102),
-    max_stack_height_in: P($("s_stack").value, 102),
+    max_stack_height_in: P($("s_legalh").value, 162),   // fallback only; per-truck stack governs
     dunnage_height_in:   P($("s_dun").value, 4),
     two_panel_gap_in:    P($("s_gap2").value, 6),
     multi_panel_gap_in:  P($("s_gapm").value, 15),
-    overhang_front_in:   P($("s_ovf").value, 0),
-    overhang_back_in:    P($("s_ovb").value, 0),
-    overhang_width_in:   P($("s_ovw").value, 0),
     max_per_row:         Math.max(1, Math.floor(num($("s_maxrow").value)||3)),
     support_tol_in:      Math.max(0, P($("s_suptol").value, 12)),
     pack_priority:       $("s_prio").value,
@@ -352,16 +490,14 @@ function readSettings(){
     max_payload_lb:      Math.max(0, num($("s_payload").value))
   };
   const errs=[];
-  if(st.truck_length_in<=0) errs.push("Truck length must be > 0.");
-  if(st.truck_width_in<=0) errs.push("Truck width must be > 0.");
-  if(st.max_stack_height_in <= st.dunnage_height_in + st.panel_thickness_in)
-    errs.push("Max stack height must exceed dunnage + one panel thickness.");
   return {st, errs};
 }
 $("btnSaveSet").addEventListener("click",()=>{
   const raw={};
-  ["s_len","s_wid","s_stack","s_dun","s_gap2","s_gapm","s_ovf","s_ovb","s_ovw","s_thick","s_count","s_payload","s_maxrow","s_suptol","s_prio","s_rate"]
+  ["s_dun","s_gap2","s_gapm","s_thick","s_count","s_payload","s_maxrow","s_suptol","s_prio","s_rate","s_fleet","s_wpolicy","s_legalh"]
     .forEach(id=>raw[id]=$(id).value);
+  raw.rentals=rentalRows;
+  raw.inhouse=inhouseRows;
   downloadText("trucking_settings.json", JSON.stringify(raw,null,2), "application/json");
 });
 $("btnLoadSet").addEventListener("click",()=>$("setinput").click());
@@ -371,9 +507,10 @@ $("setinput").addEventListener("change",()=>{
   r.onload=e=>{
     try{
       const raw=JSON.parse(e.target.result);
-      if(raw.s_ovl!=null && raw.s_ovf==null){ raw.s_ovf=raw.s_ovl; raw.s_ovb="0"; }  // legacy single length overhang
       if(raw.s_gap3!=null && raw.s_gapm==null){ raw.s_gapm=raw.s_gap3; }             // legacy 3-panel gap
-      Object.keys(raw).forEach(k=>{ if($(k)) $(k).value=raw[k]; });
+      Object.keys(raw).forEach(k=>{ if(typeof raw[k]==="string" && $(k)) $(k).value=raw[k]; });
+      if(Array.isArray(raw.rentals)){ rentalRows=raw.rentals; renderRentals(); }
+      if(Array.isArray(raw.inhouse)){ inhouseRows=raw.inhouse; renderInhouse(); }
     }catch(ex){ $("seterr").textContent="Could not read settings file: "+ex.message; $("seterr").style.display="block"; }
   };
   r.readAsText(f);
@@ -421,32 +558,34 @@ function buildPanels(){
   return {panels, errs:[], warns};
 }
 
-// ------------------------------------------- support-aware packer v4
-// Beam-search packer. Explores many alternative panel-to-truck assignments
-// and keeps the plan that (in priority order):
-//   1. opens each additional truck as LATE in the install sequence as
-//      possible  -> the trucks on site together carry the longest possible
-//      run of consecutive installs (maximizes first-day capacity),
-//   2. uses the fewest trucks,
-//   3. uses the fewest total layers.
-// Per-truck stacks are validated by DP: rows CENTERED on the deck, a row may
-// overhang its supporting row by at most support_tol per end, install order
-// top-down, row length / panels-per-row / stack height limits respected.
-function packTrucks(seq, st){
-  const L_max=st.truck_length_in+st.overhang_front_in+st.overhang_back_in;
-  const W_max=st.truck_width_in+2*st.overhang_width_in;
-  const H_max=st.max_stack_height_in;
+// ------------------------------------------- fleet packer v6
+// Loads are packed against a FLEET of truck types (in-house units with fixed
+// quantities + rental types with unlimited units, one trip per day each).
+// Beam search chooses, for every load, both the panels on it and the truck
+// type carrying it. Candidate plans are scored by the day-by-day simulation:
+//   1. most panels installed each day (earliest days first),
+//   2. fewest rental units needed,
+//   3. fewest loads, 4. fewest layers.
+// Stacks: rows CENTERED, pyramid support within support_tol per end, install
+// order top-down, per-type row length / stack height, global gaps & thickness.
+function packTrucks(seq, st, fleet){
+  const H_fallback=st.max_stack_height_in;
   const dun=st.dunnage_height_in, gap2=st.two_panel_gap_in, gapM=st.multi_panel_gap_in;
   const thick=st.panel_thickness_in;
   const maxN=Math.max(1,Math.floor(st.max_per_row||3));
   const K=Math.max(1,Math.floor(st.trucks_on_site));
-  const PAY=st.max_payload_lb;                    // 0 = ignore
-  const useWeight=PAY>0;
+  const PAY_G=st.max_payload_lb;
   const tol2=2*Math.max(0, st.support_tol_in||0);
-  const maxRows=Math.max(1, Math.floor(H_max/(dun+thick)));
-  const BEAM=128;
+  const BEAM=96;
+  const RATE=Math.max(0, Math.floor(st.install_rate||0));
+  const effRate=RATE>0?RATE:Infinity;
 
-  // Gap rule: gap before the LAST panel in a row is gap2; all others gapM.
+  const types=fleet.map(ty=>({...ty,
+    H_max:ty.H_max||H_fallback,
+    maxRows:Math.max(1, Math.floor((ty.H_max||H_fallback)/(dun+thick))),
+    pay:(ty.payload>0?ty.payload:(PAY_G>0?PAY_G:0))
+  }));
+
   const layerLen=lay=>{
     const n=lay.length;
     let t=lay.reduce((s,p)=>s+p._lay_len,0);
@@ -454,9 +593,9 @@ function packTrucks(seq, st){
     return t;
   };
   const wOf=p=>(p.weight_lb==null?0:p.weight_lb);
+  const fitsType=(r,ty)=> r._lay_across<=ty.W_max && r._lay_len<=ty.L_max && (!ty.pay || wOf(r)<=ty.pay);
 
-  // DP stack layout for one truck's panel list; returns rows (top->bottom) or null.
-  function layout(P){
+  function layout(P, ty){
     const m=P.length;
     if(!m) return [];
     const lenMemo={};
@@ -474,7 +613,7 @@ function packTrucks(seq, st){
     const par=Array.from({length:m},()=>new Array(m).fill(-1));
     for(let i=0;i<m;i++){
       for(let j=Math.max(0,i-maxN+1); j<=i; j++){
-        if(len(j,i)>L_max) continue;
+        if(len(j,i)>ty.L_max) continue;
         if(j===0){ dp[i][j]=1; par[i][j]=-2; continue; }
         const cap=len(j,i)+tol2;
         let bestR=-1,bestJ2=-1,bestLen=-1;
@@ -495,7 +634,7 @@ function packTrucks(seq, st){
         bRows=dp[m-1][j]; bLen=len(j,m-1); bi=j;
       }
     }
-    if(bi<0 || bRows>maxRows) return null;
+    if(bi<0 || bRows>ty.maxRows) return null;
     const rows=[]; let i=m-1, j=bi;
     for(;;){
       rows.push(P.slice(j,i+1));
@@ -507,178 +646,216 @@ function packTrucks(seq, st){
     return rows;
   }
 
-  // ---- pre-filter oversize; precompute laydown dims ----
+  // ---- oversize prefilter: must fit at least one type ----
   const oversize=[], loadable=[];
   for(const r of seq){
     r._lay_len=Math.max(r.width_in,r.height_in);
     r._lay_across=Math.min(r.width_in,r.height_in);
     r._wtOnly=false;
-    if(r._lay_across>W_max || r._lay_len>L_max){ r._truck="OVERSIZE"; oversize.push(r); continue; }
-    if(useWeight && wOf(r)>PAY){ r._truck="OVERSIZE"; r._wtOnly=true; oversize.push(r); continue; }
+    if(!types.some(ty=>fitsType(r,ty))){
+      r._truck="OVERSIZE";
+      r._wtOnly=types.some(ty=>r._lay_across<=ty.W_max&&r._lay_len<=ty.L_max);
+      oversize.push(r); continue;
+    }
     loadable.push(r);
   }
 
-  // ---- beam search over truck assignments ----
-  // state: { trucks:[{panels,layers,weight}], openIdx:[..], opens:[panelIdx when each truck beyond the first K opened], layers:int }
-  const PRIO=st.pack_priority==="day1"?"day1":"trucks";
+  // ---- day-by-day simulation with unit availability (one trip/day/unit) ----
+  function simulate(state){
+    const loads=state.loads;
+    const remaining=loads.map(l=>l.panels.length);
+    const loadNoOf=new Map();
+    loads.forEach((l,i)=>l.panels.forEach(p=>loadNoOf.set(p,i)));
+    const busy={};                         // typeId -> units currently on site
+    types.forEach(ty=>busy[ty.id]=0);
+    const rentalPeak={}, inhousePeak={};
+    let onSite=[], nextLoad=0, i=0, guard=0;
+    const days=[];
+    while(i<loadable.length && guard++<3000){
+      // morning arrivals: loads arrive in order while slots + units available
+      let waitingFor=null;
+      while(onSite.length<K && nextLoad<loads.length){
+        const ty=loads[nextLoad].type;
+        const cap=ty.kind==="inhouse"?ty.qty:Infinity;
+        if(busy[ty.id]>=cap){ waitingFor={load:nextLoad,ty}; break; }
+        busy[ty.id]++;
+        if(ty.kind==="rental") rentalPeak[ty.id]=Math.max(rentalPeak[ty.id]||0,busy[ty.id]);
+        else inhousePeak[ty.id]=Math.max(inhousePeak[ty.id]||0,busy[ty.id]);
+        onSite.push(nextLoad++);
+      }
+      const installed=[];
+      while(installed.length<effRate && i<loadable.length && onSite.indexOf(loadNoOf.get(loadable[i]))>=0){
+        remaining[loadNoOf.get(loadable[i])]--;
+        installed.push(loadable[i]); i++;
+      }
+      let blockedBy=null;
+      if(i<loadable.length && installed.length<effRate){
+        blockedBy=loadNoOf.get(loadable[i])+1;   // 1-based load number
+      }
+      const departed=onSite.filter(li=>remaining[li]===0);
+      days.push({day:days.length+1, onSite:onSite.map(li=>li+1), installed, blockedBy,
+                 departed:departed.map(li=>li+1),
+                 waiting:waitingFor?{load:waitingFor.load+1,name:waitingFor.ty.name}:null});
+      for(const li of departed) busy[loads[li].type.id]--;   // unit free next morning
+      onSite=onSite.filter(li=>remaining[li]>0);
+      if(!installed.length && !departed.length && days.length>1 &&
+         days[days.length-2].onSite.join()===days[days.length-1].onSite.join()) break;  // no progress
+    }
+    const rentalUnits=Object.values(rentalPeak).reduce((a,b)=>a+b,0);
+    return {days, rentalPeak, inhousePeak, rentalUnits, complete:i>=loadable.length};
+  }
+  const simCache=new Map();
+  const simOf=stt=>{ if(!simCache.has(stt)) simCache.set(stt,simulate(stt)); return simCache.get(stt); };
 
-  const cmpTrucks=(a,b)=>{           // fewest trucks, then latest opens, then fewest layers
-    if(a.trucks.length!==b.trucks.length) return a.trucks.length<b.trucks.length;
+  const cmpSched=(a,b)=>{
+    const sa=simOf(a), sb=simOf(b);
+    if(sa.complete!==sb.complete) return sa.complete;
+    const n=Math.max(sa.days.length,sb.days.length);
+    for(let d=0;d<n;d++){
+      const ca=d<sa.days.length?sa.days[d].installed.length:0, cb=d<sb.days.length?sb.days[d].installed.length:0;
+      if(ca!==cb) return ca>cb;
+    }
+    if(sa.rentalUnits!==sb.rentalUnits) return sa.rentalUnits<sb.rentalUnits;
+    if(a.loads.length!==b.loads.length) return a.loads.length<b.loads.length;
+    return a.layers<b.layers;
+  };
+  const cmpLoads=(a,b)=>{
+    if(a.loads.length!==b.loads.length) return a.loads.length<b.loads.length;
+    return cmpSched(a,b);
+  };
+
+  // ---- successor generation ----
+  function extendSuccessors(stt, r, out){
+    let any=false;
+    for(const li of stt.openIdx){
+      const l=stt.loads[li], ty=l.type;
+      if(!fitsType(r,ty)) continue;
+      if(ty.pay && l.weight+wOf(r)>ty.pay) continue;
+      const rows=layout(l.panels.concat([r]), ty);
+      if(!rows) continue;
+      any=true;
+      const loads=stt.loads.slice();
+      loads[li]={type:ty, panels:l.panels.concat([r]), layers:rows, weight:l.weight+wOf(r)};
+      out.push({loads, openIdx:stt.openIdx, opens:stt.opens, layers:stt.layers-l.layers.length+rows.length});
+    }
+    return any;
+  }
+  function openSuccessors(stt, r, out, allowed, kEff){
+    const kk=kEff||K;
+    for(const ty of (allowed||types)){
+      if(!fitsType(r,ty)) continue;
+      const loads=stt.loads.concat([{type:ty, panels:[r], layers:[[r]], weight:wOf(r)}]);
+      let openIdx=stt.openIdx.concat([loads.length-1]);
+      if(openIdx.length>kk) openIdx=openIdx.slice(1);
+      const opens=loads.length>kk ? stt.opens.concat([stt._pi]) : stt.opens;
+      out.push({loads, openIdx, opens, layers:stt.layers+1});
+    }
+  }
+
+  // cheap comparators for PARTIAL states (never simulate partials)
+  const cmpP_loads=(a,b)=>{
+    if(a.loads.length!==b.loads.length) return a.loads.length<b.loads.length;
     const n=Math.min(a.opens.length,b.opens.length);
     for(let i=0;i<n;i++) if(a.opens[i]!==b.opens[i]) return a.opens[i]>b.opens[i];
     return a.layers<b.layers;
   };
-  const cmpDay1=(a,b)=>{             // latest FIRST extra truck, then fewest trucks, then latest opens, then fewest layers
+  const cmpP_late=(a,b)=>{
     const a0=a.opens.length?a.opens[0]:Infinity, b0=b.opens.length?b.opens[0]:Infinity;
     if(a0!==b0) return a0>b0;
-    if(a.trucks.length!==b.trucks.length) return a.trucks.length<b.trucks.length;
-    const n=Math.min(a.opens.length,b.opens.length);
-    for(let i=1;i<n;i++) if(a.opens[i]!==b.opens[i]) return a.opens[i]>b.opens[i];
-    return a.layers<b.layers;
+    return cmpP_loads(a,b);
   };
 
-  function beamSearch(cmp){
-    let beam=[{trucks:[], openIdx:[], opens:[], layers:0}];
-    loadable.forEach((r,pi)=>{
+  function beamSearch(cmp, allowed, kEff){
+    if(allowed && !loadable.every(r=>allowed.some(ty=>fitsType(r,ty)))) return [];  // subset can't carry all panels
+    let beam=[{loads:[], openIdx:[], opens:[], layers:0}];
+    let pi=0;
+    for(const r of loadable){
       const next=[];
       for(const stt of beam){
-        let any=false;
-        for(const ti of stt.openIdx){
-          const t=stt.trucks[ti];
-          if(useWeight && t.weight+wOf(r)>PAY) continue;
-          const rows=layout(t.panels.concat([r]));
-          if(!rows) continue;
-          any=true;
-          const trucks=stt.trucks.slice();
-          trucks[ti]={panels:t.panels.concat([r]), layers:rows, weight:t.weight+wOf(r)};
-          next.push({trucks, openIdx:stt.openIdx, opens:stt.opens,
-                     layers:stt.layers-t.layers.length+rows.length});
-        }
-        if(!any){
-          const trucks=stt.trucks.slice();
-          trucks.push({panels:[r], layers:[[r]], weight:wOf(r)});
-          let openIdx=stt.openIdx.concat([trucks.length-1]);
-          if(openIdx.length>K) openIdx=openIdx.slice(1);           // oldest truck dispatched
-          const opens=trucks.length>K ? stt.opens.concat([pi]) : stt.opens;
-          next.push({trucks, openIdx, opens, layers:stt.layers+1});
-        }
+        stt._pi=pi;
+        if(!extendSuccessors(stt,r,next)) openSuccessors(stt,r,next,allowed,kEff);
       }
-      // dedupe identical assignments, keep best per key
+      pi++;
+      if(!next.length) return [];
       const seen=new Map();
       for(const stt of next){
-        const key=stt.trucks.map(t=>t.panels.map(p=>p._install_seq).join(",")).join("|");
+        const key=stt.loads.map(l=>l.type.id+":"+l.panels.map(p=>p._install_seq).join(",")).join("|");
         const prev=seen.get(key);
         if(!prev || cmp(stt,prev)) seen.set(key,stt);
       }
-      // prune with per-truck-count buckets so alternative branch depths survive
       const byCount=new Map();
       for(const stt of seen.values()){
-        (byCount.get(stt.trucks.length)||byCount.set(stt.trucks.length,[]).get(stt.trucks.length)).push(stt);
+        (byCount.get(stt.loads.length)||byCount.set(stt.loads.length,[]).get(stt.loads.length)).push(stt);
       }
       const counts=[...byCount.keys()].sort((x,y)=>x-y);
       const per=Math.max(8, Math.floor(BEAM/Math.max(1,counts.length)));
       let pruned=[];
-      for(const c of counts){
-        pruned=pruned.concat(byCount.get(c).sort((a,b)=>cmp(a,b)?-1:cmp(b,a)?1:0).slice(0,per));
-      }
+      for(const c of counts) pruned=pruned.concat(byCount.get(c).sort((a,b)=>cmp(a,b)?-1:cmp(b,a)?1:0).slice(0,per));
       beam=pruned.sort((a,b)=>cmp(a,b)?-1:cmp(b,a)?1:0).slice(0,BEAM);
-    });
+    }
     return beam;
   }
 
-  // greedy candidate generators (cheap; guarantee sane fallbacks the beam may prune)
-  function runGreedy(strat){
-    const state={trucks:[], openIdx:[], opens:[], layers:0};
-    loadable.forEach((r,pi)=>{
-      const cands=[];
-      for(const ti of state.openIdx){
-        const t=state.trucks[ti];
-        if(useWeight && t.weight+wOf(r)>PAY) continue;
-        const rows=layout(t.panels.concat([r]));
-        if(rows) cands.push({ti, rows, rowsN:rows.length, delta:rows.length-t.layers.length});
-      }
-      if(cands.length){
-        if(strat==="oldest")      cands.sort((a,b)=>a.ti-b.ti);
-        if(strat==="newest")      cands.sort((a,b)=>b.ti-a.ti);
-        if(strat==="fewest_rows") cands.sort((a,b)=>a.rowsN-b.rowsN||a.ti-b.ti);
-        if(strat==="min_growth")  cands.sort((a,b)=>a.delta-b.delta||a.ti-b.ti);
-        const c=cands[0], t=state.trucks[c.ti];
-        state.layers+=c.rows.length-t.layers.length;
-        state.trucks[c.ti]={panels:t.panels.concat([r]), layers:c.rows, weight:t.weight+wOf(r)};
+  function runGreedy(strat, typePick){
+    const stt={loads:[], openIdx:[], opens:[], layers:0};
+    let pi=0;
+    for(const r of loadable){
+      stt._pi=pi++;
+      const out=[];
+      if(extendSuccessors(stt,r,out)){
+        if(strat==="oldest")      out.sort((a,b)=>0);
+        if(strat==="fewest_rows") out.sort((a,b)=>a.layers-b.layers);
+        const c=out[0];
+        stt.loads=c.loads; stt.openIdx=c.openIdx; stt.layers=c.layers;
       }else{
-        state.trucks.push({panels:[r], layers:[[r]], weight:wOf(r)});
-        state.openIdx=state.openIdx.concat([state.trucks.length-1]);
-        if(state.openIdx.length>K) state.openIdx=state.openIdx.slice(1);
-        if(state.trucks.length>K) state.opens=state.opens.concat([pi]);
-        state.layers+=1;
+        const cand=types.filter(ty=>fitsType(r,ty));
+        cand.sort(typePick==="big"?(a,b)=>b.L_max-a.L_max:(a,b)=>a.L_max-b.L_max);
+        const ty=cand[0];
+        stt.loads=stt.loads.concat([{type:ty, panels:[r], layers:[[r]], weight:wOf(r)}]);
+        stt.openIdx=stt.openIdx.concat([stt.loads.length-1]);
+        if(stt.openIdx.length>K) stt.openIdx=stt.openIdx.slice(1);
+        if(stt.loads.length>K) stt.opens=stt.opens.concat([stt._pi]);
+        stt.layers+=1;
       }
-    });
-    return state;
+    }
+    return stt;
   }
 
-  const finals=[...beamSearch(cmpTrucks), ...beamSearch(cmpDay1),
-                runGreedy("oldest"), runGreedy("newest"), runGreedy("fewest_rows"), runGreedy("min_growth")];
-
-  // ---- day-by-day site simulation ----
-  // Trucks arrive in numeric order, at most K on site. A truck leaves at the
-  // END of the day it becomes empty; its replacement arrives next morning.
-  // The crew installs up to RATE panels/day, strictly in install order; if the
-  // next needed panel is on a truck not yet on site, the crew is blocked for
-  // the rest of the day.
-  const RATE=Math.max(0, Math.floor(st.install_rate||0));
-  function simulate(state){
-    if(!RATE) return null;
-    const tNoOf=new Map();
-    state.trucks.forEach((t,ti)=>t.panels.forEach(p=>tNoOf.set(p,ti+1)));
-    const remaining=state.trucks.map(t=>t.panels.length);
-    const total=state.trucks.length;
-    let onSite=[], nextArrive=1, i=0, guard=0;
-    const days=[];
-    while(i<loadable.length && guard++<2000){
-      while(onSite.length<K && nextArrive<=total) onSite.push(nextArrive++);
-      const installed=[];
-      while(installed.length<RATE && i<loadable.length && onSite.indexOf(tNoOf.get(loadable[i]))>=0){
-        remaining[tNoOf.get(loadable[i])-1]--;
-        installed.push(loadable[i]); i++;
-      }
-      const blockedBy=(i<loadable.length && installed.length<RATE)?tNoOf.get(loadable[i]):null;
-      const departed=onSite.filter(tn=>remaining[tn-1]===0);
-      days.push({day:days.length+1, onSite:onSite.slice(), installed, blockedBy, departed});
-      onSite=onSite.filter(tn=>remaining[tn-1]>0);
-    }
-    return days;
+  // fleet subsets: full fleet, plus each kind alone (mixed must never lose to a pure mode)
+  const subsets=[types];
+  const ih=types.filter(t=>t.kind==="inhouse"), rt=types.filter(t=>t.kind==="rental");
+  if(ih.length && rt.length){ subsets.push(ih); subsets.push(rt); }
+  const unitsOf=sub=>sub.some(t=>t.kind==="rental")?Infinity:sub.reduce((s,t)=>s+t.qty,0);
+  const finals=[];
+  for(const sub of subsets){
+    const kEff=Math.min(K, Math.max(1, unitsOf(sub)===Infinity?K:unitsOf(sub)));
+    finals.push(...beamSearch(cmpP_loads, sub, kEff), ...beamSearch(cmpP_late, sub, kEff));
+    if(kEff<K) finals.push(...beamSearch(cmpP_loads, sub, K));  // also try full width; sim will judge
   }
-  const simCache=new Map();
-  const simOf=stt=>{ if(!simCache.has(stt)) simCache.set(stt,simulate(stt)); return simCache.get(stt); };
-  const cmpSched=(a,b)=>{        // more panels installed each day, earlier days first
-    const sa=simOf(a), sb=simOf(b);
-    const n=Math.max(sa.length,sb.length);
-    for(let d=0;d<n;d++){
-      const ca=d<sa.length?sa[d].installed.length:0, cb=d<sb.length?sb[d].installed.length:0;
-      if(ca!==cb) return ca>cb;
-    }
-    if(a.trucks.length!==b.trucks.length) return a.trucks.length<b.trucks.length;
-    return a.layers<b.layers;
-  };
-  const cmpTrucksSched=(a,b)=>{  // fewest trucks first, then best schedule
-    if(a.trucks.length!==b.trucks.length) return a.trucks.length<b.trucks.length;
-    return cmpSched(a,b);
-  };
-
-  let finalCmp;
-  if(RATE) finalCmp = PRIO==="day1" ? cmpSched : cmpTrucksSched;
-  else     finalCmp = PRIO==="day1" ? cmpDay1 : cmpTrucks;
+  finals.push(runGreedy("oldest","big"), runGreedy("oldest","small"),
+    runGreedy("fewest_rows","big"), runGreedy("fewest_rows","small"));
+  const finalCmp=(st.pack_priority==="trucks")?cmpLoads:cmpSched;
   let best=finals[0];
   for(const stt of finals) if(finalCmp(stt,best)) best=stt;
-  if(!best) best={trucks:[],openIdx:[],opens:[],layers:0};
-  const schedule=RATE?simulate(best):null;
+  if(!best) best={loads:[],openIdx:[],layers:0};
+  const sim=simulate(best);
 
-  const trucks=best.trucks.map((t,i)=>{
-    for(const p of t.panels) p._truck=i+1;
-    return {no:i+1, panels:t.panels, layers:t.layers,
-            height:t.layers.length*(dun+thick), weight:t.weight};
+  const trucks=best.loads.map((l,i)=>{
+    for(const p of l.panels) p._truck=i+1;
+    return {no:i+1, panels:l.panels, layers:l.layers,
+            height:l.layers.length*(dun+thick), weight:l.weight,
+            typeName:l.type.name, typeKind:l.type.kind, type:l.type};
   });
-  return {trucks, oversize, layerLen, L_max, W_max, schedule, rate:RATE};
+  return {trucks, oversize, layerLen, schedule:(RATE>0?sim.days:null), rate:RATE, schedComplete:sim.complete,
+          rentalPeak:sim.rentalPeak, inhousePeak:sim.inhousePeak, rentalUnits:sim.rentalUnits,
+          types, W_max:Math.max(...types.map(t=>t.W_max)), L_max:Math.max(...types.map(t=>t.L_max))};
+}
+
+// width permit tier for a truck's widest panel (panels ride flat)
+function widthTier(acrossIn){
+  if(acrossIn<=102) return {tier:"none",  label:"no width permit"};
+  if(acrossIn<=144) return {tier:"permit",label:"WIDTH PERMIT "+fmtFtIn(acrossIn)};
+  return {tier:"escort",label:"ESCORT REQUIRED "+fmtFtIn(acrossIn)};
 }
 
 // ---------------------------------------------------------------- run
@@ -690,7 +867,10 @@ $("btnRun").addEventListener("click",()=>{
   const allErr=[...sErr,...pErr];
   if(allErr.length){ $("seterr").textContent=allErr.join("  |  "); $("seterr").style.display="block"; window.scrollTo({top:$("seterr").offsetTop-120,behavior:"smooth"}); return; }
 
-  const res=packTrucks(panels, st);
+  const {fleet, errs:fErr}=buildFleet();
+  if(fErr.length){ $("fleeterr").textContent=fErr.join("  |  "); $("fleeterr").style.display="block"; return; }
+  $("fleeterr").style.display="none";
+  const res=packTrucks(panels, st, fleet);
   // physical load order: bottom layer first
   const loadOrder=new Map();
   for(const t of res.trucks){
@@ -729,6 +909,14 @@ function renderResults(R){
     s+=cell(R.schedule.length,"install days @ "+R.rate+"/day");
     s+=cell(blocked,"days crew blocked by deliveries", blocked?"bad":"");
   }
+  {
+    const ihu=Object.values(R.inhousePeak||{}).reduce((a,b)=>a+b,0);
+    s+=cell(ihu,"in-house units used");
+    s+=cell(R.rentalUnits||0,"rental units needed", R.rentalUnits?"accent":"");
+    const tiers=R.trucks.map(t=>widthTier(Math.max(...t.layers.flat().map(p=>p._lay_across))).tier);
+    const nPermit=tiers.filter(x=>x==="permit").length, nEsc=tiers.filter(x=>x==="escort").length;
+    if(nPermit||nEsc) s+=cell(nPermit+(nEsc?" + "+nEsc+" esc":""),"trucks needing width permits", nEsc?"bad":"accent");
+  }
   $("sumstrip").innerHTML=s;
   function cell(n,l,cls){return '<div class="sumcell"><div class="n '+(cls||"")+'">'+n+'</div><div class="l">'+l+'</div></div>';}
 
@@ -740,6 +928,9 @@ function renderResults(R){
 
   // delivery & install schedule
   const sb=$("schedbox"); sb.innerHTML="";
+  if(R.schedComplete===false){
+    sb.innerHTML='<div class="msg err" style="display:block;margin-bottom:22px"><b>Schedule cannot complete with this fleet:</b> the delivery rotation deadlocks (a needed truck can never arrive). Check more trucks, add a rental option, or increase in-house quantities.</div>';
+  }
   if(R.schedule){
     let h='<h3 class="rsec">Delivery &amp; install schedule &mdash; '+R.rate+' panels/day, '+Math.floor(R.st.trucks_on_site)+' trucks on site</h3>';
     h+='<div class="plantable" style="margin-bottom:26px"><table><tr><th>Day</th><th>Trucks on site</th><th>Installed</th><th>Panels</th><th>End of day</th></tr>';
@@ -747,12 +938,21 @@ function renderResults(R){
       const names=d.installed.length?(d.installed[0].panel_name+(d.installed.length>1?" &rarr; "+d.installed[d.installed.length-1].panel_name:"")):"&mdash;";
       const insts=d.installed.length?("inst#"+d.installed[0]._install_seq+(d.installed.length>1?"&ndash;"+d.installed[d.installed.length-1]._install_seq:"")):"";
       let note=d.departed.length?d.departed.map(tn=>"TRUCK "+tn+" empty &mdash; departs").join(", "):"";
+      if(d.waiting) note+=(note?"; ":"")+"TRUCK "+d.waiting.load+" waiting for a free "+escapeHtml(d.waiting.name);
       let blocked=d.blockedBy!=null?'<span style="color:var(--warn);font-weight:600">crew blocked &mdash; waiting for TRUCK '+d.blockedBy+'</span>':"";
       h+="<tr><td>Day "+d.day+"</td><td>"+d.onSite.map(tn=>"TRUCK "+tn).join(", ")+"</td>"
         +"<td>"+names+(insts?" <span style='color:var(--steel)'>("+insts+")</span>":"")+(blocked?"<br>"+blocked:"")+"</td>"
         +"<td>"+d.installed.length+" / "+R.rate+"</td><td>"+(note||"&mdash;")+"</td></tr>";
     }
     sb.innerHTML=h+"</table></div>";
+  }
+  {
+    const parts=[];
+    for(const ty of R.types||[]){
+      const n=(ty.kind==="rental"?(R.rentalPeak||{}):(R.inhousePeak||{}))[ty.id]||0;
+      if(n>0) parts.push(n+" &times; "+escapeHtml(ty.name)+(ty.kind==="rental"?" <b>(rent)</b>":""));
+    }
+    if(parts.length) sb.insertAdjacentHTML("beforeend",'<div class="msg note" style="display:block;margin-bottom:22px"><b>Fleet usage:</b> '+parts.join(" &middot; ")+"</div>");
   }
 
   // truck cards with SVG stacks
@@ -763,12 +963,17 @@ function renderResults(R){
   const ob=$("oversizebox"); ob.innerHTML="";
   if(R.oversize.length){
     let h='<div class="msg err" style="display:block;margin-bottom:22px"><b>OVERSIZE — arrange special transport:</b><br>';
-    h+=R.oversize.map(p=>escapeHtml(p.panel_name)+" ("+fmtFtIn(p._lay_len)+" × "+fmtFtIn(p._lay_across)+") inst#"+p._install_seq+(p._wtOnly?" — exceeds payload":"")).join("<br>");
+    const maxW=Math.max(...(R.types||[{W_max:102}]).map(t=>t.W_max));
+    h+=R.oversize.map(p=>{
+      let why=p._wtOnly?" — exceeds payload":"";
+      if(!p._wtOnly && p._lay_across>maxW && p._lay_across<=BED_WIDTH_IN+2*180) why=" — blocked by the load width policy (raise it to permit/escort)";
+      return escapeHtml(p.panel_name)+" ("+fmtFtIn(p._lay_len)+" × "+fmtFtIn(p._lay_across)+") inst#"+p._install_seq+why;
+    }).join("<br>");
     ob.innerHTML=h+"</div>";
   }
 
   // per-panel table
-  let th='<table><tr><th>Install #</th><th>Panel</th><th>Type</th><th>Wall</th><th>Width</th><th>Height</th>'+(anyWeight?'<th>Weight lb</th>':'')+'<th>Truck</th><th>Layer from top</th><th>Slot</th><th>Load order</th><th>Note</th></tr>';
+  let th='<table><tr><th>Install #</th><th>Panel</th><th>Type</th><th>Wall</th><th>Width</th><th>Height</th>'+(anyWeight?'<th>Weight lb</th>':'')+'<th>Truck</th><th>Truck type</th><th>Layer from top</th><th>Slot</th><th>Load order</th><th>Note</th></tr>';
   for(const r of R.seq){
     const tno=r._truck==null?"":r._truck;
     let li="",slot="";
@@ -780,7 +985,7 @@ function renderResults(R){
     th+="<tr><td>"+r._install_seq+"</td><td>"+escapeHtml(r.panel_name)+"</td><td>"+escapeHtml(r.panel_type)+"</td><td>"+escapeHtml(r.wall_id)+"</td>"
       +"<td>"+fmtFtIn(r.width_in)+"</td><td>"+fmtFtIn(r.height_in)+"</td>"
       +(anyWeight?"<td>"+(r.weight_lb==null?"—":Math.round(r.weight_lb).toLocaleString())+"</td>":"")
-      +"<td"+(tno==="OVERSIZE"?' class="oversize"':'')+">"+tno+"</td><td>"+li+"</td><td>"+slot+"</td><td>"+(R.loadOrder.get(r)||"")+"</td><td"+(note?' class="oversize"':'')+">"+note+"</td></tr>";
+      +"<td"+(tno==="OVERSIZE"?' class="oversize"':'')+">"+tno+"</td><td>"+escapeHtml((tno!=="OVERSIZE"&&tno!=="")?((R.trucks.find(t=>t.no===tno)||{}).typeName||""):"")+"</td><td>"+li+"</td><td>"+slot+"</td><td>"+(R.loadOrder.get(r)||"")+"</td><td"+(note?' class="oversize"':'')+">"+note+"</td></tr>";
   }
   $("plantable").innerHTML=th+"</table>";
   $("results").scrollIntoView({behavior:"smooth"});
@@ -788,13 +993,20 @@ function renderResults(R){
 
 // ---- SVG side-view stack for one truck ----
 function truckCard(t,R){
-  const st=R.st, L_max=R.L_max;
+  const st=R.st, L_max=(t.type?t.type.L_max:R.L_max);
   const nLay=t.layers.length, nP=t.layers.reduce((s,l)=>s+l.length,0);
   const card=document.createElement("div"); card.className="truckcard";
-  const wt=(st.max_payload_lb>0 && t.weight>0)
-    ? ' &middot; payload <b>'+Math.round(t.weight).toLocaleString()+'</b> / '+Math.round(st.max_payload_lb).toLocaleString()+' lb':'';
+  const payCap=(t.type&&t.type.pay)?t.type.pay:st.max_payload_lb;
+  const wt=(payCap>0 && t.weight>0)
+    ? ' &middot; payload <b>'+Math.round(t.weight).toLocaleString()+'</b> / '+Math.round(payCap).toLocaleString()+' lb':'';
+  const hmax=t.type?t.type.H_max:st.max_stack_height_in;
+  const wAcross=Math.max(...t.layers.flat().map(p=>p._lay_across));
+  const wt2=widthTier(wAcross);
+  const wtHtml=' &middot; load width <b>'+fmtFtIn(wAcross)+'</b> &mdash; '+(wt2.tier==="none"?'no permit':'<span style="color:'+(wt2.tier==="permit"?"var(--hivis)":"var(--warn)")+';font-weight:700">'+(wt2.tier==="permit"?"width permit":"escort required")+'</span>')
+    +(t.type&&t.type.deck!=null?' &middot; total height <b>'+fmtFtIn(t.type.deck+t.height)+'</b> / '+fmtFtIn(parseLen($("s_legalh").value,162))+' incl. deck':'');
   card.innerHTML='<div class="thead"><span class="tno">TRUCK '+t.no+'</span>'
-    +'<span class="tmeta"><b>'+nLay+'</b> layer(s) &middot; <b>'+nP+'</b> panel(s) &middot; stack <b>'+fmtFtIn(t.height)+'</b> / '+fmtFtIn(st.max_stack_height_in)+wt+'</span></div>';
+    +(t.typeName?'<span class="tmeta" style="color:var(--hivis);font-weight:600">'+escapeHtml(t.typeName)+(t.typeKind==="rental"?" (rental)":"")+'</span>':'')
+    +'<span class="tmeta"><b>'+nLay+'</b> layer(s) &middot; <b>'+nP+'</b> panel(s) &middot; stack <b>'+fmtFtIn(t.height)+'</b> / '+fmtFtIn(hmax)+wt+wtHtml+'</span></div>';
 
   // geometry: draw bottom layer at bottom (layers[0] is TOP)
   const VW=1100, padL=64, padR=150, padT=16, padB=34;
@@ -859,7 +1071,7 @@ function planRows(R){
   const anyWeight=R.seq.some(p=>p.weight_lb!=null);
   const head=["install_seq","panel_name","panel_type","wall_id","width_in","height_in"];
   if(anyWeight) head.push("weight_lb");
-  head.push("truck_no","layer_from_top","slot_in_layer","truck_load_order","note");
+  head.push("truck_no","truck_type","layer_from_top","slot_in_layer","truck_load_order","note");
   const rows=[head];
   for(const r of R.seq){
     const tno=r._truck==null?"":r._truck;
@@ -871,7 +1083,7 @@ function planRows(R){
     const note=tno==="OVERSIZE"?(r._wtOnly?"exceeds payload -- special transport":"exceeds truck envelope -- special transport"):"";
     const row=[r._install_seq,r.panel_name,r.panel_type,r.wall_id,r.width_in,r.height_in];
     if(anyWeight) row.push(r.weight_lb==null?"":r.weight_lb);
-    row.push(tno,li,slot,R.loadOrder.get(r)||"",note);
+    row.push(tno,(tno!=="OVERSIZE"&&tno!=="")?((R.trucks.find(t=>t.no===tno)||{}).typeName||""):"",li,slot,R.loadOrder.get(r)||"",note);
     rows.push(row);
   }
   return rows;
@@ -889,9 +1101,9 @@ $("btnXlsx").addEventListener("click",()=>{
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(planRows(lastResult)), "trucking_plan");
   // second sheet: per-truck summary
-  const sum=[["truck_no","layers","panels","stack_height_in","payload_lb"]];
+  const sum=[["truck_no","truck_type","layers","panels","stack_height_in","payload_lb"]];
   for(const t of lastResult.trucks)
-    sum.push([t.no,t.layers.length,t.layers.reduce((s,l)=>s+l.length,0),Math.round(t.height*100)/100,Math.round(t.weight)]);
+    sum.push([t.no,t.typeName||"",t.layers.length,t.layers.reduce((s,l)=>s+l.length,0),Math.round(t.height*100)/100,Math.round(t.weight)]);
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sum), "truck_summary");
   XLSX.writeFile(wb,"trucking_plan.xlsx");
 });
@@ -910,21 +1122,31 @@ function layoutTxt(R){
   if(R.oversize.length) lines.push("OVERSIZE (special transport, not on trucks): "+R.oversize.length+" panel(s)");
   lines.push("Panels loaded: "+(R.seq.length-R.oversize.length)+" of "+R.seq.length);
   lines.push("");
-  lines.push("Settings: truck "+fmtFtIn(st.truck_length_in)+" x "+fmtFtIn(st.truck_width_in)
-    +" | max stack "+fmtFtIn(st.max_stack_height_in)+" | dunnage "+fmtFtIn(st.dunnage_height_in)
+  lines.push("Settings: dunnage "+fmtFtIn(st.dunnage_height_in)
     +" | gap before last panel "+fmtFtIn(st.two_panel_gap_in)+" / other gaps "+fmtFtIn(st.multi_panel_gap_in)
     +" | max "+Math.floor(st.max_per_row||3)+" per row | support tol "+fmtFtIn(st.support_tol_in||0)+" per end"
     +" | priority: "+(st.pack_priority==="day1"?"max daily throughput":"fewest trucks")
     +(R.rate?" | install rate "+R.rate+" panels/day":"")
-    +" | overhang front "+fmtFtIn(st.overhang_front_in)+" / back "+fmtFtIn(st.overhang_back_in)+" / W "+fmtFtIn(st.overhang_width_in)+" per side"
     +" | panel thickness "+fmtFtIn(st.panel_thickness_in)
     +(st.max_payload_lb>0?" | max payload "+Math.round(st.max_payload_lb)+" lb":""));
+  lines.push("Fleet: "+(R.types||[]).map(ty=>ty.name+" ["+ty.kind+(ty.kind==="inhouse"?" x"+ty.qty:"")+", "+fmtFtIn(ty.L_max)+" usable x "+fmtFtIn(ty.W_max)+", stack "+fmtFtIn(ty.H_max)+(ty.pay?", "+Math.round(ty.pay)+" lb":"")+"]").join("  |  "));
+  {
+    const parts=[];
+    for(const ty of R.types||[]){
+      const n=(ty.kind==="rental"?(R.rentalPeak||{}):(R.inhousePeak||{}))[ty.id]||0;
+      if(n>0) parts.push(n+" x "+ty.name+(ty.kind==="rental"?" (RENT)":""));
+    }
+    if(parts.length) lines.push("Fleet usage: "+parts.join("  |  "));
+  }
   lines.push("Sequence: install order from spreadsheet (column-mapped).");
   lines.push("Rule: install order runs TOP-DOWN in each stack; physical loading is the reverse (bottom layer first).");
   lines.push("Rule: rows are CENTERED on the deck; a row overhangs its supporting row by at most the support tolerance per end.");
+  lines.push("Width policy: <= 8'6\" no permit; 8'6\" to 12' width permit for the widest panel on the trailer; over 12' escort. Physical cap = bed 8'6\" + side overhangs.");
+  lines.push("Height rule: deck height + N x (dunnage + panel thickness) must stay within the legal total of "+fmtFtIn(parseLen(document.getElementById("s_legalh").value,162))+".");
   lines.push("");
   if(R.schedule){
     lines.push(dash);
+    if(R.schedComplete===false) lines.push("WARNING: schedule cannot complete with this fleet (delivery rotation deadlocks).");
     lines.push("DELIVERY & INSTALL SCHEDULE  ("+R.rate+" panels/day, "+Math.floor(st.trucks_on_site)+" trucks on site)");
     for(const d of R.schedule){
       const names=d.installed.length?(d.installed[0].panel_name+(d.installed.length>1?" -> "+d.installed[d.installed.length-1].panel_name:"")):"-";
@@ -939,16 +1161,20 @@ function layoutTxt(R){
   for(const t of R.trucks){
     const nP=t.layers.reduce((s,l)=>s+l.length,0), nLay=t.layers.length;
     lines.push(dash);
-    lines.push("TRUCK "+t.no+"   ("+nLay+" layer(s), "+nP+" panel(s), stack height "
-      +fmtFtIn(t.height)+" / "+fmtFtIn(st.max_stack_height_in)
+    const _wa=Math.max(...t.layers.flat().map(p=>p._lay_across));
+    lines.push("TRUCK "+t.no+(t.typeName?"  ["+t.typeName+(t.typeKind==="rental"?" - RENTAL":"")+"]":"")+"   ("+nLay+" layer(s), "+nP+" panel(s), stack height "
+      +fmtFtIn(t.height)+" / "+fmtFtIn(t.type?t.type.H_max:st.max_stack_height_in)
+      +", load width "+fmtFtIn(_wa)+" - "+widthTier(_wa).label
+      +(t.type&&t.type.deck!=null?", total height "+fmtFtIn(t.type.deck+t.height)+" incl. deck":"")
       +(st.max_payload_lb>0&&t.weight>0?", payload "+Math.round(t.weight)+" lb":"")+")");
     t.layers.forEach((lay,li)=>{
       const tag=li===0?"TOP   ":(li===nLay-1?"BOTTOM":"      ");
       const cells=lay.map(p=>p.panel_name+" ("+fmtFtIn(p._lay_len)+" x "+fmtFtIn(p._lay_across)+") inst#"+p._install_seq).join("  |  ");
       const used=R.layerLen(lay);
       lines.push("  Layer "+String(li+1).padStart(2)+" "+tag+" : "+cells);
-      lines.push("             row length "+fmtFtIn(used)+" / "+fmtFtIn(L_max)
-        +"  ("+(L_max?Math.round(100*used/L_max):0)+"% used)");
+      const LT=t.type?t.type.L_max:L_max;
+      lines.push("             row length "+fmtFtIn(used)+" / "+fmtFtIn(LT)
+        +"  ("+(LT?Math.round(100*used/LT):0)+"% used)");
     });
     lines.push("  Load order: Layer "+nLay+" (BOTTOM) first -> Layer 1 (TOP) last.");
   }
