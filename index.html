@@ -14,14 +14,14 @@
   --steel:#5B6472;
   --line:#D8DBD4;
   --card:#FFFFFF;
-  --hivis:#E8590C;
-  --hivis-soft:#FDEEE3;
+  --hivis:#22ba04;
+  --hivis-soft:#dcfad4;
   --ok:#2B8A3E;
   --warn:#C92A2A;
   --warn-soft:#FBEAEA;
   --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
   --sans:'Archivo',system-ui,-apple-system,Segoe UI,sans-serif;
-  --main-font: Arial;
+  --main-font:'Arial';
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -67,13 +67,13 @@ select:focus,input:focus{outline:2px solid var(--hivis);outline-offset:-1px}
 
 /* ---------- settings ---------- */
 .settings-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px 20px}
-.sgroup{grid-column:1/-1;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--steel);border-bottom:1px solid var(--line);padding-bottom:5px;margin-top:8px}
+.sgroup{grid-column:1/-1;font-family:var(--main-font);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--steel);border-bottom:1px solid var(--line);padding-bottom:5px;margin-top:8px}
 .sgroup:first-child{margin-top:0}
 .field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px}
-.field .unit{font-family:var(--mono);font-size:11px;color:var(--steel);font-weight:400}
+.field .unit{font-family:var(--main-font);font-size:11px;color:var(--steel);font-weight:400}
 .settings-actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}
 .invtable{border:1px solid var(--line);overflow-x:auto}
-.invtable table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12.5px;min-width:860px}
+.invtable table{border-collapse:collapse;width:100%;font-family:var(--main-font);font-size:12.5px;min-width:860px}
 .invtable th{background:var(--ink);color:var(--paper);text-align:left;padding:7px 10px;font-weight:600;white-space:nowrap}
 .invtable td{padding:5px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
 .invtable input[type=text],.invtable input[type=number]{width:92px;padding:5px 7px}
@@ -82,7 +82,7 @@ select:focus,input:focus{outline:2px solid var(--hivis);outline-offset:-1px}
 .invtable .del{cursor:pointer;color:var(--warn);font-weight:700;border:none;background:none;padding:2px 8px;font-size:14px}
 
 /* ---------- buttons ---------- */
-button{font-family:var(--sans);font-weight:700;font-size:14px;letter-spacing:.03em;text-transform:uppercase;padding:11px 22px;border:1px solid var(--ink);background:#fff;color:var(--ink);cursor:pointer;border-radius:0;transition:background .12s,color .12s}
+button{font-family:var(--main-font);font-weight:700;font-size:14px;letter-spacing:.03em;text-transform:uppercase;padding:11px 22px;border:1px solid var(--ink);background:#fff;color:var(--ink);cursor:pointer;border-radius:0;transition:background .12s,color .12s}
 button:hover{background:var(--ink);color:#fff}
 button.primary{background:var(--hivis);border-color:var(--hivis);color:#fff;font-size:15px}
 button.primary:hover{background:#C94A08;border-color:#C94A08}
@@ -93,7 +93,7 @@ button.primary:disabled:hover{background:var(--hivis);color:#fff}
 .runbar{display:flex;justify-content:center;margin:6px 0 34px}
 
 /* ---------- messages ---------- */
-.msg{padding:12px 16px;margin-top:14px;font-family:var(--mono);font-size:13px;display:none;border-left:4px solid}
+.msg{padding:12px 16px;margin-top:14px;font-family:var(--main-font);font-size:13px;display:none;border-left:4px solid}
 .msg.err{display:block;background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
 .msg.ok{display:block;background:#EAF6EC;border-color:var(--ok);color:var(--ok)}
 .msg.note{display:block;background:var(--hivis-soft);border-color:var(--hivis);color:#9A3E08}
@@ -102,28 +102,28 @@ button.primary:disabled:hover{background:var(--hivis);color:#fff}
 #results{display:none}
 .sumstrip{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:28px}
 .sumcell{background:var(--card);padding:18px 20px}
-.sumcell .n{font-family:var(--mono);font-size:34px;font-weight:600;line-height:1}
+.sumcell .n{font-family:var(--main-font);font-size:34px;font-weight:600;line-height:1}
 .sumcell .n.accent{color:var(--hivis)}
 .sumcell .n.bad{color:var(--warn)}
-.sumcell .l{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--steel);margin-top:7px}
+.sumcell .l{font-family:var(--main-font);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--steel);margin-top:7px}
 
 .truckcard{background:var(--card);border:1px solid var(--line);margin-bottom:22px}
 .truckcard .thead{display:flex;align-items:center;gap:14px;padding:13px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-.truckcard .tno{font-family:var(--mono);font-weight:600;font-size:15px;background:var(--ink);color:var(--paper);padding:4px 12px}
-.truckcard .tmeta{font-family:var(--mono);font-size:12px;color:var(--steel)}
+.truckcard .tno{font-family:var(--main-font);font-weight:600;font-size:15px;background:var(--ink);color:var(--paper);padding:4px 12px}
+.truckcard .tmeta{font-family:var(--main-font);font-size:12px;color:var(--steel)}
 .truckcard .tmeta b{color:var(--ink)}
 .truckcard svg{display:block;width:100%;height:auto}
-.truckcard .tfoot{padding:9px 20px;border-top:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--steel)}
+.truckcard .tfoot{padding:9px 20px;border-top:1px solid var(--line);font-family:var(--main-font);font-size:12px;color:var(--steel)}
 
 .plantable{overflow:auto;border:1px solid var(--line);background:var(--card)}
-.plantable table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12.5px}
+.plantable table{border-collapse:collapse;width:100%;font-family:var(--main-font);font-size:12.5px}
 .plantable th{background:var(--ink);color:var(--paper);text-align:left;padding:8px 12px;font-weight:600;white-space:nowrap;position:sticky;top:0}
 .plantable td{padding:6px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
 .plantable tr:nth-child(even) td{background:var(--paper)}
 .plantable td.oversize{color:var(--warn);font-weight:600}
 .exportbar{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0 8px}
 h3.rsec{font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-stretch:92%;margin:30px 0 12px;padding-left:12px;border-left:4px solid var(--hivis)}
-footer{margin-top:48px;font-family:var(--mono);font-size:11px;color:var(--steel);border-top:1px solid var(--line);padding-top:14px}
+footer{margin-top:48px;font-family:var(--main-font);font-size:11px;color:var(--steel);border-top:1px solid var(--line);padding-top:14px}
 </style>
 </head>
 <body>
@@ -132,9 +132,8 @@ footer{margin-top:48px;font-family:var(--mono);font-size:11px;color:var(--steel)
 <header>
   <div class="brand">
     <h1>Panel <span>Trucking</span> Planner</h1>
-    <p>load manifest generator &mdash; install-order stacking, greedy packer v1</p>
   </div>
-  <div class="manifest-no">standalone port of pyRevit trucking module<b>v9 &mdash; fraction-safe parser</b><b id="hdrDate"></b></div>
+  <div <b id="hdrDate"></b></div>
 </header>
 
 <!-- STEP 1 -->
@@ -460,6 +459,7 @@ function buildFleet(){
     if(H<=dun+thick){ errs.push("\""+r.name+"\": deck "+fmtFtIn(D)+" leaves only "+fmtFtIn(Math.max(0,H))+" under the "+fmtFtIn(legalH)+" legal height — not enough for dunnage + one panel."); return null; }
     const ovw=parseLen(r.ovw,0);
     return {name:r.name||(kind+" "+(i+1)), kind, qty:1, deck:D,
+      len:L, ovf:parseLen(r.ovf,0), ovb:parseLen(r.ovb,0),
       L_max:L+parseLen(r.ovf,0)+parseLen(r.ovb,0),
       W_max:Math.min(cap, BED_WIDTH_IN+2*ovw),
       H_max:H, payload:Math.max(0,parseFloat(r.pay)||0)};
@@ -1023,50 +1023,78 @@ function truckCard(t,R){
     +(t.typeName?'<span class="tmeta" style="color:var(--hivis);font-weight:600">'+escapeHtml(t.typeName)+(t.typeKind==="rental"?" (rental)":"")+'</span>':'')
     +'<span class="tmeta"><b>'+nLay+'</b> layer(s) &middot; <b>'+nP+'</b> panel(s) &middot; stack <b>'+fmtFtIn(t.height)+'</b> / '+fmtFtIn(hmax)+wt+wtHtml+'</span></div>';
 
-  // geometry: draw bottom layer at bottom (layers[0] is TOP)
-  const VW=1100, padL=64, padR=150, padT=16, padB=34;
+  // geometry: draw bottom layer at bottom (layers[0] is TOP).
+  // Coordinate space spans the usable envelope (front OH + trailer + back OH);
+  // the thick deck bar is the PHYSICAL trailer; rows are centered on the deck
+  // and spill into the dashed overhang zones only when longer than the deck.
+  const tyLen=(t.type&&t.type.len!=null)?t.type.len:L_max;
+  const tyOvf=(t.type&&t.type.ovf!=null)?t.type.ovf:0;
+  const tyOvb=(t.type&&t.type.ovb!=null)?t.type.ovb:0;
+  const VW=1100, padL=64, padR=150, padT=16, padB=48;
   const rowH=40, dunH=6, gapY=4;
   const innerW=VW-padL-padR;
   const VH=padT+nLay*(rowH+dunH+gapY)+padB;
-  const sx=len=>len/L_max*innerW;
+  const sx=len=>len/L_max*innerW;                    // inches -> px within envelope
+  const px=posIn=>padL+sx(posIn);                    // envelope inches -> abs x
+
+  // physical placement of a row of length rl (inches) within the envelope
+  function rowStartIn(rl){
+    if(rl<=tyLen) return tyOvf+(tyLen-rl)/2;         // fits: center on the deck
+    const excess=rl-tyLen;
+    let f=Math.min(tyOvf,excess/2), b=excess-f;
+    if(b>tyOvb){ b=tyOvb; f=excess-b; }
+    return tyOvf-f;                                   // spill split per allowed limits
+  }
 
   let svg='<svg viewBox="0 0 '+VW+' '+VH+'" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Mono,monospace">';
-  // deck line
   const deckY=VH-padB;
-  svg+='<line x1="'+(padL-10)+'" y1="'+deckY+'" x2="'+(VW-padR+10)+'" y2="'+deckY+'" stroke="#191C21" stroke-width="3"/>';
-  svg+='<text x="'+(padL-10)+'" y="'+(deckY+18)+'" font-size="11" fill="#5B6472">DECK &mdash; usable row length '+fmtFtIn(L_max)+'</text>';
+  // dashed envelope baseline (usable length incl. overhangs)
+  svg+='<line x1="'+px(0)+'" y1="'+deckY+'" x2="'+px(L_max)+'" y2="'+deckY+'" stroke="#B9BDB4" stroke-width="1.5" stroke-dasharray="5,4"/>';
+  // physical deck bar
+  svg+='<rect x="'+px(tyOvf)+'" y="'+(deckY-1.5)+'" width="'+sx(tyLen)+'" height="5" fill="#191C21"/>';
+  // overhang zone labels
+  if(tyOvf>0) svg+='<text x="'+(px(tyOvf/2))+'" y="'+(deckY+18)+'" font-size="10.5" fill="#5B6472" text-anchor="middle">OH '+fmtFtIn(tyOvf)+'</text>';
+  if(tyOvb>0) svg+='<text x="'+(px(tyOvf+tyLen+tyOvb/2))+'" y="'+(deckY+18)+'" font-size="10.5" fill="#5B6472" text-anchor="middle">OH '+fmtFtIn(tyOvb)+'</text>';
+  svg+='<text x="'+px(tyOvf)+'" y="'+(deckY+32)+'" font-size="11" fill="#5B6472">DECK '+fmtFtIn(tyLen)+' &mdash; usable '+fmtFtIn(L_max)+' with overhang</text>';
 
-  // layers drawn from bottom up: iterate reversed
   for(let k=0;k<nLay;k++){
-    const li=nLay-1-k;               // index into t.layers, bottom first when k=0
+    const li=nLay-1-k;
     const lay=t.layers[li];
     const y=deckY-(k+1)*(rowH+dunH+gapY)+gapY;
-    const dy=y+rowH;                  // dunnage under this layer
-    // dunnage
-    svg+='<rect x="'+padL+'" y="'+dy+'" width="'+innerW+'" height="'+dunH+'" fill="#D8DBD4"/>';
-    // panels
-    // panels — row centered on the deck
-    const pw=lay.map(p=>Math.max(sx(p._lay_len),46));
-    const pg=lay.slice(0,-1).map((_,pi)=>Math.max(sx(pi===lay.length-2?R.st.two_panel_gap_in:R.st.multi_panel_gap_in),3));
-    const rowPix=pw.reduce((a,b)=>a+b,0)+pg.reduce((a,b)=>a+b,0);
-    let cx=padL+Math.max(0,(innerW-rowPix)/2);
+    const dy=y+rowH;
+    const used=R.layerLen(lay);
+    const startIn=rowStartIn(used);
+    // dunnage strip only over the deck (dunnage sits on the trailer)
+    svg+='<rect x="'+px(tyOvf)+'" y="'+dy+'" width="'+sx(tyLen)+'" height="'+dunH+'" fill="#D8DBD4"/>';
+    // panels at physical positions
+    let cxIn=startIn;
     lay.forEach((p,pi)=>{
-      const w=pw[pi];
-      svg+='<rect x="'+cx+'" y="'+y+'" width="'+w+'" height="'+rowH+'" fill="#FDEEE3" stroke="#E8590C" stroke-width="1.5"/>';
-      svg+='<text x="'+(cx+w/2)+'" y="'+(y+16)+'" font-size="12" font-weight="600" text-anchor="middle" fill="#191C21">'+escapeHtml(p.panel_name)+'</text>';
-      svg+='<text x="'+(cx+w/2)+'" y="'+(y+31)+'" font-size="10.5" text-anchor="middle" fill="#5B6472">'+fmtFtIn(p._lay_len)+' &#215; '+fmtFtIn(p._lay_across)+' &middot; inst#'+p._install_seq+'</text>';
-      cx+=w;
+      const wIn=p._lay_len;
+      const x=px(cxIn), w=Math.max(sx(wIn),12);
+      svg+='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+rowH+'" fill="#FDEEE3" stroke="#E8590C" stroke-width="1.5"/>';
+      if(w>=90){
+        svg+='<text x="'+(x+w/2)+'" y="'+(y+16)+'" font-size="12" font-weight="600" text-anchor="middle" fill="#191C21">'+escapeHtml(p.panel_name)+'</text>';
+        svg+='<text x="'+(x+w/2)+'" y="'+(y+31)+'" font-size="10.5" text-anchor="middle" fill="#5B6472">'+fmtFtIn(p._lay_len)+' &#215; '+fmtFtIn(p._lay_across)+' &middot; inst#'+p._install_seq+'</text>';
+      }else{
+        svg+='<text x="'+(x+w/2)+'" y="'+(y+rowH/2+4)+'" font-size="10" font-weight="600" text-anchor="middle" fill="#191C21">'+escapeHtml(p.panel_name)+'</text>';
+      }
+      cxIn+=wIn;
       if(pi<lay.length-1){
-        svg+='<rect x="'+cx+'" y="'+(y+rowH*0.35)+'" width="'+pg[pi]+'" height="'+(rowH*0.3)+'" fill="none" stroke="#5B6472" stroke-dasharray="3,3"/>';
-        cx+=pg[pi];
+        const gIn=(pi===lay.length-2?R.st.two_panel_gap_in:R.st.multi_panel_gap_in);
+        svg+='<rect x="'+px(cxIn)+'" y="'+(y+rowH*0.35)+'" width="'+Math.max(sx(gIn),2)+'" height="'+(rowH*0.3)+'" fill="none" stroke="#5B6472" stroke-dasharray="3,3"/>';
+        cxIn+=gIn;
       }
     });
-    // labels right side
-    const used=R.layerLen(lay), pct=L_max?Math.round(100*used/L_max):0;
+    // right-side labels
+    const pct=L_max?Math.round(100*used/L_max):0;
+    const ohF=Math.max(0,tyOvf-startIn), ohB=Math.max(0,(startIn+used)-(tyOvf+tyLen));
     const tag=(li===0?"TOP":(li===nLay-1?"BOTTOM":""));
     svg+='<text x="'+(VW-padR+12)+'" y="'+(y+15)+'" font-size="11" fill="#191C21" font-weight="600">L'+(li+1)+(tag?' &middot; '+tag:'')+'</text>';
-    svg+='<text x="'+(VW-padR+12)+'" y="'+(y+30)+'" font-size="10.5" fill="#5B6472">'+fmtFtIn(used)+' &middot; '+pct+'%</text>';
-    // left: physical load order of this layer (bottom = loaded first)
+    svg+='<text x="'+(VW-padR+12)+'" y="'+(y+30)+'" font-size="10.5" fill="#5B6472">'+fmtFtIn(used)+' &middot; '+pct+'%'
+      +((ohF>0.01||ohB>0.01)?' &middot; <tspan fill="#E8590C" font-weight="600">OH</tspan>':'')+'</text>';
+    if(ohF>0.01||ohB>0.01){
+      svg+='<text x="'+(VW-padR+12)+'" y="'+(y+43)+'" font-size="9.5" fill="#E8590C">'+(ohF>0.01?'F '+fmtFtIn(ohF)+' ':'')+(ohB>0.01?'B '+fmtFtIn(ohB):'')+'</text>';
+    }
     svg+='<text x="'+(padL-14)+'" y="'+(y+rowH/2+4)+'" font-size="10.5" fill="#5B6472" text-anchor="end">load '+(k+1)+'</text>';
   }
   svg+='</svg>';
