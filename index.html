@@ -804,12 +804,14 @@ function packTrucks(seq, st, fleet){
   }
 
   // cheap comparators for PARTIAL states (never simulate partials)
+  const rentCount=stt=>stt.loads.reduce((n,l)=>n+(l.type.kind==="rental"?1:0),0);
   const cmpP_loads=(a,b)=>{
     if(a.loads.length!==b.loads.length) return a.loads.length<b.loads.length;
     const n=Math.min(a.opens.length,b.opens.length);
     for(let i=0;i<n;i++) if(a.opens[i]!==b.opens[i]) return a.opens[i]>b.opens[i];
-    return a.layers<b.layers;
-  };
+    if(a.layers!==b.layers) return a.layers<b.layers;
+    return rentCount(a)<rentCount(b);
+};
   const cmpP_late=(a,b)=>{
     const a0=a.opens.length?a.opens[0]:Infinity, b0=b.opens.length?b.opens[0]:Infinity;
     if(a0!==b0) return a0>b0;
@@ -860,7 +862,10 @@ function packTrucks(seq, st, fleet){
         stt.loads=c.loads; stt.openIdx=c.openIdx; stt.layers=c.layers;
       }else{
         const cand=types.filter(ty=>fitsType(r,ty));
-        cand.sort(typePick==="big"?(a,b)=>b.L_max-a.L_max:(a,b)=>a.L_max-b.L_max);
+        cand.sort((x,y)=>{
+          if(typePick.startsWith("ih_") && x.kind!==y.kind) return x.kind==="inhouse"?-1:1;
+          return typePick.endsWith("big")?y.L_max-x.L_max:x.L_max-y.L_max;
+      });
         const ty=cand[0];
         stt.loads=stt.loads.concat([{type:ty, panels:[r], layers:[[r]], weight:wOf(r)}]);
         stt.openIdx=stt.openIdx.concat([stt.loads.length-1]);
