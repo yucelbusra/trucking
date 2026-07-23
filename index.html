@@ -880,7 +880,9 @@ function packTrucks(seq, st, fleet){
   // fleet subsets: full fleet, plus each kind alone (mixed must never lose to a pure mode)
   const subsets=[types];
   const ih=types.filter(t=>t.kind==="inhouse"), rt=types.filter(t=>t.kind==="rental");
-  if(ih.length && rt.length){ subsets.push(ih); subsets.push(rt); }
+  if(ih.length && rt.length){ subsets.push(ih); subsets.push(rt);
+    if(ih.length>1) for(const t of ih) subsets.push([t].concat(rt));   // each in-house type + rentals
+  }
   const unitsOf=sub=>sub.some(t=>t.kind==="rental")?Infinity:sub.reduce((s,t)=>s+t.qty,0);
   const finals=[];
   for(const sub of subsets){
@@ -889,13 +891,37 @@ function packTrucks(seq, st, fleet){
     if(kEff<K) finals.push(...beamSearch(cmpP_loads, sub, K));  // also try full width; sim will judge
   }
   finals.push(runGreedy("oldest","big"), runGreedy("oldest","small"),
-    runGreedy("fewest_rows","big"), runGreedy("fewest_rows","small"),
-    runGreedy("oldest","ih_big"), runGreedy("oldest","ih_small"),
-    runGreedy("fewest_rows","ih_big"), runGreedy("fewest_rows","ih_small"));
+    runGreedy("fewest_rows","big"), runGreedy("fewest_rows","small"));
   const finalCmp=(st.pack_priority==="trucks")?cmpLoads:cmpSched;
   let best=finals[0];
   for(const stt of finals) if(finalCmp(stt,best)) best=stt;
-  if(!best) best={loads:[],openIdx:[],layers:0};
+  if(!best) best={loads:[],openIdx:[],opens:[],layers:0};
+
+  // rental-reduction pass: retype rental loads onto checked in-house trucks
+  // wherever the stack is feasible and the schedule does not get worse.
+  (function reduceRentals(){
+    const ihTypes=types.filter(t=>t.kind==="inhouse");
+    if(!ihTypes.length || !best.loads.length) return;
+    let improved=true;
+    while(improved){
+      improved=false;
+      for(let li=0; li<best.loads.length; li++){
+        const l=best.loads[li];
+        if(l.type.kind!=="rental") continue;
+        for(const ty of ihTypes){
+          if(ty.pay && l.weight>ty.pay) continue;
+          if(l.panels.some(p=>!fitsType(p,ty))) continue;
+          const rows=layout(l.panels, ty);
+          if(!rows) continue;
+          const loads=best.loads.slice();
+          loads[li]={type:ty, panels:l.panels, layers:rows, weight:l.weight};
+          const cand={loads, openIdx:best.openIdx, opens:best.opens,
+                      layers:best.layers-l.layers.length+rows.length};
+          if(!finalCmp(best,cand)){ best=cand; improved=true; break; }  // ties or wins -> take it
+        }
+      }
+    }
+  })();
   const sim=simulate(best);
 
   const trucks=best.loads.map((l,i)=>{
