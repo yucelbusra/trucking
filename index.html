@@ -889,7 +889,9 @@ function packTrucks(seq, st, fleet){
     if(kEff<K) finals.push(...beamSearch(cmpP_loads, sub, K));  // also try full width; sim will judge
   }
   finals.push(runGreedy("oldest","big"), runGreedy("oldest","small"),
-    runGreedy("fewest_rows","big"), runGreedy("fewest_rows","small"));
+    runGreedy("fewest_rows","big"), runGreedy("fewest_rows","small"),
+    runGreedy("oldest","ih_big"), runGreedy("oldest","ih_small"),
+    runGreedy("fewest_rows","ih_big"), runGreedy("fewest_rows","ih_small"));
   const finalCmp=(st.pack_priority==="trucks")?cmpLoads:cmpSched;
   let best=finals[0];
   for(const stt of finals) if(finalCmp(stt,best)) best=stt;
