@@ -1195,23 +1195,22 @@ function renderResults(R){
       h+="<tr><td style='color:var(--steel)'>Preload "+pl.day+"</td><td>&mdash;</td><td style='color:var(--steel)'>plant loads "+pl.loaded.map(n=>"TRUCK "+n).join(", ")+"</td><td>&mdash;</td><td>&mdash;</td></tr>";
     }
     for(const d of R.schedule){
-      const names=d.installed.length?(d.installed[0].panel_name+(d.installed.length>1?" &rarr; "+d.installed[d.installed.length-1].panel_name:"")):"&mdash;";
-      const insts=d.installed.length?("inst#"+d.installed[0]._install_seq+(d.installed.length>1?"&ndash;"+d.installed[d.installed.length-1]._install_seq:"")):"";
+      const names=d.installed.length?(escapeHtml(d.installed[0].panel_name)+(d.installed.length>1?" &rarr; "+escapeHtml(d.installed[d.installed.length-1].panel_name):"")):"&mdash;";
       let note=d.departed.length?d.departed.map(tn=>"TRUCK "+tn+" empty &mdash; departs").join(", "):"";
       if(d.arrivedToday&&d.arrivedToday.length) note+=(note?"; ":"")+d.arrivedToday.map(tn=>"TRUCK "+tn+" arrives").join(", ");
       if(d.loadedToday&&d.loadedToday.length) note+=(note?"; ":"")+"plant loads "+d.loadedToday.map(n=>"TRUCK "+n).join(", ");
       if(d.waiting) note+=(note?"; ":"")+"TRUCK "+d.waiting.load+" "+(d.waiting.reason?escapeHtml(d.waiting.reason):"waiting for a free "+escapeHtml(d.waiting.name));
       let blocked=d.blockedBy!=null?'<span style="color:var(--warn);font-weight:600">crew blocked &mdash; waiting for TRUCK '+d.blockedBy+'</span>':"";
       h+="<tr><td>Day "+d.day+"</td><td>"+d.onSite.map(tn=>"TRUCK "+tn).join(", ")+"</td>"
-        +"<td>"+names+(insts?" <span style='color:var(--steel)'>("+insts+")</span>":"")+(blocked?"<br>"+blocked:"")+"</td>"
+        +"<td>"+names+(blocked?"<br>"+blocked:"")+"</td>"
         +"<td>"+d.installed.length+" / "+R.rate+"</td><td>"+(note||"&mdash;")+"</td></tr>";
     }
     h+="</table></div>";
     h+='<h3 class="rsec">Truck flow &mdash; shop &harr; jobsite by day</h3>';
     for(const d of R.schedule){
-      const names=d.installed.length?(d.installed[0].panel_name+(d.installed.length>1?" &rarr; "+d.installed[d.installed.length-1].panel_name:"")):null;
+      const names=d.installed.length?(escapeHtml(d.installed[0].panel_name)+(d.installed.length>1?" &rarr; "+escapeHtml(d.installed[d.installed.length-1].panel_name):"")):null;
       const summaryLines=[];
-      if(names) summaryLines.push("Panels "+escapeHtml(names)+" installed");
+      if(names) summaryLines.push("Panels "+names+" installed");
       if(d.departed.length) summaryLines.push(d.departed.map(tn=>"Truck "+tn+" returns to shop").join("<br>"));
       if(d.arrivedToday&&d.arrivedToday.length) summaryLines.push(d.arrivedToday.map(tn=>"Truck "+tn+" arrives on site").join("<br>"));
       if(d.staged&&d.staged.length) summaryLines.push(d.staged.length+" truck(s) staged at the shop, ready to ship");
@@ -1254,7 +1253,7 @@ function renderResults(R){
     h+=R.oversize.map(p=>{
       let why=p._wtOnly?" — exceeds payload":"";
       if(!p._wtOnly && p._lay_across>maxW && p._lay_across<=BED_WIDTH_IN+2*180) why=" — blocked by the load width policy (raise it to permit/escort)";
-      return escapeHtml(p.panel_name)+" ("+fmtFtIn(p._lay_len)+" × "+fmtFtIn(p._lay_across)+") inst#"+p._install_seq+why;
+      return escapeHtml(p.panel_name)+" ("+fmtFtIn(p._lay_len)+" × "+fmtFtIn(p._lay_across)+")"+why;
     }).join("<br>");
     ob.innerHTML=h+"</div>";
   }
@@ -1604,7 +1603,7 @@ function layoutTxt(R){
       +", dunnage "+_dun+" pcs"+(String(t.label).indexOf(".")>=0?" (reused from this truck)":"")+(t.cost!=null?", cost $"+Math.round(t.cost).toLocaleString():"")+")");
     t.layers.forEach((lay,li)=>{
       const tag=li===0?"TOP   ":(li===nLay-1?"BOTTOM":"      ");
-      const cells=lay.map(p=>p.panel_name+" ("+fmtFtIn(p._lay_len)+" x "+fmtFtIn(p._lay_across)+") inst#"+p._install_seq).join("  |  ");
+      const cells=lay.map(p=>p.panel_name+" ("+fmtFtIn(p._lay_len)+" x "+fmtFtIn(p._lay_across)+")").join("  |  ");
       const used=R.layerLen(lay);
       lines.push("  Layer "+String(li+1).padStart(2)+" "+tag+" : "+cells);
       const LT=t.type?t.type.L_max:L_max;
@@ -1617,7 +1616,7 @@ function layoutTxt(R){
     lines.push(dash);
     lines.push("OVERSIZE PANELS (exceed truck envelope; arrange special transport):");
     for(const p of R.oversize)
-      lines.push("  "+p.panel_name+"  ("+fmtFtIn(p._lay_len)+" x "+fmtFtIn(p._lay_across)+")  inst#"+p._install_seq+(p._wtOnly?"  [payload]":""));
+      lines.push("  "+p.panel_name+"  ("+fmtFtIn(p._lay_len)+" x "+fmtFtIn(p._lay_across)+")"+(p._wtOnly?"  [payload]":""));
   }
   lines.push(bar);
   return lines.join("\n")+"\n";
