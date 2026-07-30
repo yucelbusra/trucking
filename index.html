@@ -190,7 +190,7 @@ footer{margin-top:48px;font-family:var(--mono);font-size:11px;color:var(--steel)
 
     <div class="settings-grid" style="margin-top:22px">
       <div class="field"><label>Fleet priority <span class="unit">which trucks may be used</span></label>
-        <select id="s_fleet"><option value="mixed_ih75">Mixed &mdash; in-house favor (~75% in-house)</option><option value="mixed_rt75">Mixed &mdash; rental favor (~75% rental)</option><option value="inhouse">In-house only</option><option value="rental">Rental only</option></select></div>
+        <select id="s_fleet"><option value="mixed">Mixed &mdash; whichever combination best fits your packing priority</option><option value="inhouse">In-house only</option><option value="rental">Rental only</option></select></div>
       <div class="field"><label>Load width policy <span class="unit">permit tiers &mdash; panels ride flat</span></label>
         <select id="s_wpolicy"><option value="none">No permit &mdash; up to 8'6"</option><option value="permit">Permit &mdash; up to 12'</option><option value="escort">Escort &mdash; up to bed + side overhangs</option></select></div>
       <div class="field"><label>Max legal load height <span class="unit">ft-in &mdash; stack = this minus deck</span></label><input type="text" id="s_legalh" value="13'6&quot;"></div>
@@ -519,7 +519,7 @@ function readSettings(){
     max_per_row:         Math.max(1, Math.floor(num($("s_maxrow").value)||3)),
     support_tol_in:      Math.max(0, P($("s_suptol").value, 12)),
     pack_priority:       $("s_prio").value,
-    fleet_favor:         (function(){ const v=$("s_fleet").value; if(v==="mixed_ih75") return 0.75; if(v==="mixed_rt75") return 0.25; return null; })(),
+    fleet_favor:         null,   // mixed fleet composition is decided purely by pack_priority now (no favor bias)
     install_rate:        Math.max(0, Math.floor(num($("s_rate").value))),
     load_cap:            Math.max(1, Math.floor(num($("s_loadcap").value)||2)),
     preload_days:        Math.max(0, Math.floor(num($("s_preload").value))),
@@ -862,11 +862,9 @@ function packTrucks(seq, st, fleet){
   const simCache=new Map();
   const simOf=stt=>{ if(!simCache.has(stt)) simCache.set(stt,simulate(stt)); return simCache.get(stt); };
 
-  // fleet-mix favor: how far a candidate's in-house load SHARE sits from the
-  // target set by "Fleet priority" (0.75 = in-house favor, 0.25 = rental
-  // favor, null = no bias — pure in-house/rental modes never need it since
-  // only one kind is in play). This is a soft tie-break: schedule quality
-  // above always wins first; the favor only steers among equally-good plans.
+  // fleet-mix tie-break: with no favor bias, mixed fleet decisions are driven
+  // entirely by pack_priority (fewest trucks, or best daily schedule) — this
+  // mechanism is kept as infrastructure but TARGET_IH is always null now.
   const TARGET_IH=st.fleet_favor;
   const favorDev=stt=>{
     if(TARGET_IH==null || !stt.loads.length) return 0;
