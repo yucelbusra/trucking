@@ -193,6 +193,7 @@ footer{margin-top:48px;font-family:var(--mono);font-size:11px;color:var(--steel)
     <div class="settings-grid">
       <div class="sgroup">Stacking</div>
       <div class="field"><label>Dunnage height <span class="unit">ft-in</span></label><input type="text" id="s_dun" value="4&quot;"></div>
+      <div class="field"><label>Dunnage edge offset <span class="unit">ft-in &mdash; inset from each panel end</span></label><input type="text" id="s_dunoff" value="6&quot;"></div>
       <div class="field"><label>Panel thickness <span class="unit">ft-in</span></label><input type="text" id="s_thick" value="6.625&quot;"></div>
       <div class="field"><label>Gap between 2 panels in a row <span class="unit">ft-in &mdash; used before the LAST panel</span></label><input type="text" id="s_gap2" value="6&quot;"></div>
       <div class="field"><label>Gap between 2+ panels in a row <span class="unit">ft-in &mdash; all other gaps</span></label><input type="text" id="s_gapm" value="1'3&quot;"></div>
@@ -497,6 +498,7 @@ function readSettings(){
   const st={
     max_stack_height_in: P($("s_legalh").value, 162),   // fallback only; per-truck stack governs
     dunnage_height_in:   P($("s_dun").value, 4),
+    dunnage_edge_offset_in: Math.max(0, P($("s_dunoff").value, 6)),
     two_panel_gap_in:    P($("s_gap2").value, 6),
     multi_panel_gap_in:  P($("s_gapm").value, 15),
     max_per_row:         Math.max(1, Math.floor(num($("s_maxrow").value)||3)),
@@ -515,7 +517,7 @@ function readSettings(){
 }
 $("btnSaveSet").addEventListener("click",()=>{
   const raw={};
-  ["s_dun","s_gap2","s_gapm","s_thick","s_count","s_payload","s_maxrow","s_suptol","s_prio","s_rate","s_fleet","s_wpolicy","s_legalh","s_loadcap","s_preload"]
+  ["s_dun","s_dunoff","s_gap2","s_gapm","s_thick","s_count","s_payload","s_maxrow","s_suptol","s_prio","s_rate","s_fleet","s_wpolicy","s_legalh","s_loadcap","s_preload"]
     .forEach(id=>raw[id]=$(id).value);
   raw.rentals=rentalRows;
   raw.inhouse=inhouseRows;
@@ -1050,10 +1052,12 @@ function dunnageCount(lenIn){
   if(ft<=29) return 4;
   return 4+Math.ceil((ft-29)/14);
 }
-function dunnagePositions(lenIn){         // offsets (inches) from the panel's own start, 0..lenIn
+function dunnagePositions(lenIn, offsetIn){         // offsets (inches) from the panel's own start, 0..lenIn
   const n=dunnageCount(lenIn);
+  const off=Math.max(0, Math.min(offsetIn||0, (lenIn/2)*0.9));   // never let the offset eat past mid-panel
+  const usable=lenIn-2*off;
   const pos=[];
-  for(let i=0;i<n;i++) pos.push(i*lenIn/(n-1));
+  for(let i=0;i<n;i++) pos.push(off + i*usable/(n-1));
   return pos;
 }
 
@@ -1270,7 +1274,7 @@ function truckCard(t,R){
       const x=px(cxIn), w=Math.max(sx(wIn),12);
       // dunnage: one block per position, evenly spaced across THIS panel's own length —
       // same length always yields the same relative layout, so equal-size panels align
-      const dpos=dunnagePositions(wIn);
+      const dpos=dunnagePositions(wIn, R.st.dunnage_edge_offset_in);
       const blockW=Math.max(sx(4),3);            // ~4in wide block, schematic
       dpos.forEach(off=>{
         const dxIn=cxIn+off;
@@ -1378,7 +1382,7 @@ function topViewSvg(t,R){
     const h=Math.max(acrossIn*scale,10), y=midY-h/2;
     const overW=acrossIn>BED_WIDTH_IN;
     svg+='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="#FDEEE3" stroke="'+(overW?"#C92A2A":"#E8590C")+'" stroke-width="1.5"/>';
-    dunnagePositions(wIn).forEach(off=>{
+    dunnagePositions(wIn, R.st.dunnage_edge_offset_in).forEach(off=>{
       const dxPx=pxL(cxIn+off);
       svg+='<line x1="'+dxPx+'" y1="'+y+'" x2="'+dxPx+'" y2="'+(y+h)+'" stroke="#8A9086" stroke-width="1.5" stroke-dasharray="3,2"/>';
     });
@@ -1480,7 +1484,7 @@ function layoutTxt(R){
   lines.push("Rule: rows are CENTERED on the deck; a row may overhang the panel below it (panel-to-panel overhang) by at most the set amount per end — this is separate from each truck's panel-to-truck overhang (front/back).");
   lines.push("Width policy: <= 8'6\" no permit; 8'6\" to 12' width permit for the widest panel on the trailer; over 12' escort. Physical cap = bed 8'6\" + side overhangs.");
   lines.push("Height rule: deck height + N x (dunnage + panel thickness) must stay within the legal total of "+fmtFtIn(parseLen(document.getElementById("s_legalh").value,162))+".");
-  lines.push("Dunnage rule (per panel, by its own length): <=13ft 2 pcs | 13-15ft 3 pcs | 15-29ft 4 pcs | 29ft+ +1 per additional 14ft, evenly spaced end to end.");
+  lines.push("Dunnage rule (per panel, by its own length): <=13ft 2 pcs | 13-15ft 3 pcs | 15-29ft 4 pcs | 29ft+ +1 per additional 14ft, evenly spaced, inset "+fmtFtIn(st.dunnage_edge_offset_in||0)+" from each panel end.");
   lines.push("");
   if(R.schedule){
     lines.push(dash);
