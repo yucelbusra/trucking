@@ -1046,13 +1046,26 @@ function packTrucks(seq, st, fleet){
 
   const trucks=best.loads.map((l,i)=>{
     for(const p of l.panels) p._truck=i+1;
+    const dunnagePcs=l.layers.reduce((s,lay)=>s+lay.reduce((s2,p)=>s2+dunnageCount(p._lay_len),0),0);
     return {no:i+1, label:sim.loadLabels[i]||String(i+1), panels:l.panels, layers:l.layers,
-            height:l.layers.length*(dun+thick), weight:l.weight, cost:sim.loadCost[i],
+            height:l.layers.length*(dun+thick), weight:l.weight, cost:sim.loadCost[i], dunnagePcs,
             typeName:l.type.name, typeKind:l.type.kind, type:l.type};
   });
+  // Dunnage travels WITH the physical truck: when a slot reloads (e.g. "1" -> "1.2"),
+  // the dunnage it brought back can be reused for the next load on that same truck.
+  // So the total actually needed to own/procure is, per physical slot, only its PEAK
+  // per-load requirement — not the sum across every reload of that slot.
+  const dunGroups={};
+  for(const t of trucks){
+    const slotNo=parseInt(String(t.label).split(".")[0],10);
+    dunGroups[slotNo]=Math.max(dunGroups[slotNo]||0, t.dunnagePcs);
+  }
+  const totalDunnageOwned=Object.values(dunGroups).reduce((a,b)=>a+b,0);
+  const totalDunnageAllLoads=trucks.reduce((s,t)=>s+t.dunnagePcs,0);
   return {trucks, oversize, layerLen, schedule:(RATE>0?sim.days:null), preLog:sim.preLog, rate:RATE, schedComplete:sim.complete,
           rentalPeak:sim.rentalPeak, inhousePeak:sim.inhousePeak, rentalUnits:sim.rentalUnits, totalPhysicalTrucks:sim.totalPhysical,
           totalCost:sim.totalCost, anyCostProvided:types.some(ty=>ty.costPerDay>0),
+          totalDunnageOwned, totalDunnageAllLoads,
           types, W_max:Math.max(...types.map(t=>t.W_max)), L_max:Math.max(...types.map(t=>t.L_max))};
 }
 
@@ -1133,8 +1146,9 @@ function renderResults(R){
   s+=cell(R.oversize.length,"oversize / special transport", R.oversize.length?"bad":"");
   s+=cell(R.trucks.reduce((m,t)=>Math.max(m,t.layers.length),0),"max layers on a truck");
   {
-    const dunTotal=R.trucks.reduce((s,t)=>s+t.layers.reduce((s2,l)=>s2+l.reduce((s3,p)=>s3+dunnageCount(p._lay_len),0),0),0);
-    s+=cell(dunTotal,"total dunnage pieces","accent");
+    const owned=R.totalDunnageOwned||0, allLoads=R.totalDunnageAllLoads||0;
+    const saved=allLoads-owned;
+    s+=cell(owned,"dunnage pieces to own"+(saved>0?" ("+saved+" reused)":""),"accent");
   }
   if(R.anyCostProvided){
     s+=cell("$"+Math.round(R.totalCost||0).toLocaleString(),"total trucking cost","accent");
@@ -1270,8 +1284,8 @@ function renderResults(R){
 function truckCard(t,R){
   const st=R.st, L_max=(t.type?t.type.L_max:R.L_max);
   const nLay=t.layers.length, nP=t.layers.reduce((s,l)=>s+l.length,0);
-  let dunnageTotal=0;
-  for(const lay of t.layers) for(const p of lay) dunnageTotal+=dunnageCount(p._lay_len);
+  const dunnageTotal=(t.dunnagePcs!=null)?t.dunnagePcs:t.layers.reduce((s,lay)=>s+lay.reduce((s2,p)=>s2+dunnageCount(p._lay_len),0),0);
+  const isReload=String(t.label).indexOf(".")>=0;
   const card=document.createElement("div"); card.className="truckcard";
   const payCap=(t.type&&t.type.pay)?t.type.pay:st.max_payload_lb;
   const wt=(payCap>0 && t.weight>0)
@@ -1285,7 +1299,7 @@ function truckCard(t,R){
   card.innerHTML='<div class="thead"><span class="tno">TRUCK '+(t.label||t.no)+'</span>'
     +(t.typeName?'<span class="tmeta" style="color:var(--hivis);font-weight:600">'+escapeHtml(t.typeName)+(t.typeKind==="rental"?" (rental)":"")+'</span>':'')
     +'<span class="tmeta"><b>'+nLay+'</b> layer(s) &middot; <b>'+nP+'</b> panel(s) &middot; stack <b>'+fmtFtIn(t.height)+'</b> / '+fmtFtIn(hmax)+wt+wtHtml
-    +' &middot; dunnage <b>'+dunnageTotal+'</b> pcs'+costHtml+'</span></div>';
+    +' &middot; dunnage <b>'+dunnageTotal+'</b> pcs'+(isReload?' <span style="color:var(--steel)">(reusing this truck\'s own dunnage)</span>':'')+costHtml+'</span></div>';
 
   // geometry: draw bottom layer at bottom (layers[0] is TOP).
   // Coordinate space spans the usable envelope (front OH + trailer + back OH);
@@ -1330,6 +1344,12 @@ function truckCard(t,R){
     const used=R.layerLen(lay);
     const startIn=rowStartIn(used);
     const endIn=startIn+used;
+    // physical support boundary for THIS row's dunnage: the row below it, or
+    // the deck itself for the bottom-most row. Dunnage that would otherwise
+    // fall past this boundary (in an unsupported overhang) is pulled in to
+    // sit right at the edge of real support instead of floating over nothing.
+    const suppStart=(prevStart!=null)?prevStart:tyOvf;
+    const suppEnd=(prevEnd!=null)?prevEnd:(tyOvf+tyLen);
     // panels at physical positions, with individual dunnage blocks under each
     let cxIn=startIn;
     lay.forEach((p,pi)=>{
@@ -1337,10 +1357,11 @@ function truckCard(t,R){
       const x=px(cxIn), w=Math.max(sx(wIn),12);
       // dunnage: one block per position, evenly spaced across THIS panel's own length —
       // same length always yields the same relative layout, so equal-size panels align
+      // (unless clamped inward by an overhang, per the support-boundary rule above)
       const dpos=dunnagePositions(wIn, R.st.dunnage_edge_offset_in);
       const blockW=Math.max(sx(4),3);            // ~4in wide block, schematic
       dpos.forEach(off=>{
-        const dxIn=cxIn+off;
+        const dxIn=Math.max(suppStart, Math.min(suppEnd, cxIn+off));
         svg+='<rect x="'+(px(dxIn)-blockW/2)+'" y="'+dy+'" width="'+blockW+'" height="'+dunH+'" fill="#B9BDB4" stroke="#8A9086" stroke-width="0.5"/>';
       });
       svg+='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+rowH+'" fill="#FDEEE3" stroke="#E8590C" stroke-width="1.5"/>';
@@ -1446,7 +1467,8 @@ function topViewSvg(t,R){
     const overW=acrossIn>BED_WIDTH_IN;
     svg+='<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="#FDEEE3" stroke="'+(overW?"#C92A2A":"#E8590C")+'" stroke-width="1.5"/>';
     dunnagePositions(wIn, R.st.dunnage_edge_offset_in).forEach(off=>{
-      const dxPx=pxL(cxIn+off);
+      const dxIn=Math.max(tyOvf, Math.min(tyOvf+tyLen, cxIn+off));   // clamp to the deck — never over the truck's overhang
+      const dxPx=pxL(dxIn);
       svg+='<line x1="'+dxPx+'" y1="'+y+'" x2="'+dxPx+'" y2="'+(y+h)+'" stroke="#8A9086" stroke-width="1.5" stroke-dasharray="3,2"/>';
     });
     if(w>=55) svg+='<text x="'+(x+w/2)+'" y="'+(midY+4)+'" font-size="11" font-weight="600" text-anchor="middle" fill="#191C21">'+escapeHtml(p.panel_name)+'</text>';
@@ -1522,7 +1544,7 @@ function layoutTxt(R){
   const bar="=".repeat(78), dash="-".repeat(78);
   lines.push(bar,"TRUCKING PLAN",bar);
   lines.push("TOTAL LOADS NEEDED: "+R.trucks.length+"   |   TOTAL PHYSICAL TRUCKS: "+(R.totalPhysicalTrucks||R.trucks.length)+(R.totalPhysicalTrucks<R.trucks.length?" (some trucks reloaded and reused)":""));
-  lines.push("TOTAL DUNNAGE PIECES: "+R.trucks.reduce((s,t)=>s+t.layers.reduce((s2,l)=>s2+l.reduce((s3,p)=>s3+dunnageCount(p._lay_len),0),0),0));
+  lines.push("TOTAL DUNNAGE PIECES TO OWN: "+(R.totalDunnageOwned||0)+"   |   ACROSS ALL LOADS (no reuse): "+(R.totalDunnageAllLoads||0)+((R.totalDunnageAllLoads||0)>(R.totalDunnageOwned||0)?" ("+((R.totalDunnageAllLoads||0)-(R.totalDunnageOwned||0))+" reused via truck reloads)":""));
   if(R.anyCostProvided) lines.push("TOTAL TRUCKING COST: $"+Math.round(R.totalCost||0).toLocaleString());
   if(R.oversize.length) lines.push("OVERSIZE (special transport, not on trucks): "+R.oversize.length+" panel(s)");
   lines.push("Panels loaded: "+(R.seq.length-R.oversize.length)+" of "+R.seq.length);
@@ -1549,6 +1571,7 @@ function layoutTxt(R){
   lines.push("Width policy: <= 8'6\" no permit; 8'6\" to 12' width permit for the widest panel on the trailer; over 12' escort. Physical cap = bed 8'6\" + side overhangs.");
   lines.push("Height rule: deck height + N x (dunnage + panel thickness) must stay within the legal total of "+fmtFtIn(parseLen(document.getElementById("s_legalh").value,162))+".");
   lines.push("Dunnage rule (per panel, by its own length): <=13ft 2 pcs | 13-15ft 3 pcs | 15-29ft 4 pcs | 29ft+ +1 per additional 14ft, evenly spaced, inset "+fmtFtIn(st.dunnage_edge_offset_in||0)+" from each panel end.");
+  lines.push("Dunnage reuse: dunnage travels with its physical truck; when a truck reloads, it reuses its own dunnage, so the total to own is each truck's PEAK per-load requirement, not the sum across every reload.");
   if(R.anyCostProvided) lines.push("Cost rule: each truck is billed per day from when it starts loading (preload days included) through the day it departs empty; reused (reloaded) trucks are billed separately per use.");
   lines.push("");
   if(R.schedule){
@@ -1574,13 +1597,13 @@ function layoutTxt(R){
     const nP=t.layers.reduce((s,l)=>s+l.length,0), nLay=t.layers.length;
     lines.push(dash);
     const _wa=Math.max(...t.layers.flat().map(p=>p._lay_across));
-    const _dun=t.layers.reduce((s2,l)=>s2+l.reduce((s3,p)=>s3+dunnageCount(p._lay_len),0),0);
+    const _dun=(t.dunnagePcs!=null)?t.dunnagePcs:t.layers.reduce((s2,l)=>s2+l.reduce((s3,p)=>s3+dunnageCount(p._lay_len),0),0);
     lines.push("TRUCK "+(t.label||t.no)+(t.typeName?"  ["+t.typeName+(t.typeKind==="rental"?" - RENTAL":"")+"]":"")+"   ("+nLay+" layer(s), "+nP+" panel(s), stack height "
       +fmtFtIn(t.height)+" / "+fmtFtIn(t.type?t.type.H_max:st.max_stack_height_in)
       +", load width "+fmtFtIn(_wa)+" - "+widthTier(_wa).label
       +(t.type&&t.type.deck!=null?", total height "+fmtFtIn(t.type.deck+t.height)+" incl. deck":"")
       +(st.max_payload_lb>0&&t.weight>0?", payload "+Math.round(t.weight)+" lb":"")
-      +", dunnage "+_dun+" pcs"+(t.cost!=null?", cost $"+Math.round(t.cost).toLocaleString():"")+")");
+      +", dunnage "+_dun+" pcs"+(String(t.label).indexOf(".")>=0?" (reused from this truck)":"")+(t.cost!=null?", cost $"+Math.round(t.cost).toLocaleString():"")+")");
     t.layers.forEach((lay,li)=>{
       const tag=li===0?"TOP   ":(li===nLay-1?"BOTTOM":"      ");
       const cells=lay.map(p=>p.panel_name+" ("+fmtFtIn(p._lay_len)+" x "+fmtFtIn(p._lay_across)+") inst#"+p._install_seq).join("  |  ");
