@@ -190,7 +190,7 @@ footer{margin-top:48px;font-family:var(--mono);font-size:11px;color:var(--steel)
 
     <div class="settings-grid" style="margin-top:22px">
       <div class="field"><label>Fleet priority <span class="unit">which trucks may be used</span></label>
-        <select id="s_fleet"><option value="mixed">Mixed</option><option value="inhouse">In-house only</option><option value="rental">Rental only</option></select></div>
+        <select id="s_fleet"><option value="mixed">Mixed &mdash; whichever combination best fits your packing priority</option><option value="inhouse">In-house only</option><option value="rental">Rental only</option></select></div>
       <div class="field"><label>Load width policy <span class="unit">permit tiers</span></label>
         <select id="s_wpolicy"><option value="none">No permit &mdash; up to 8'6"</option><option value="permit">Permit &mdash; up to 12'</option><option value="escort">Escort &mdash; up to bed + side overhangs</option></select></div>
       <div class="field"><label>Max legal load height <span class="unit">ft-in &mdash; stack = this minus deck</span></label><input type="text" id="s_legalh" value="13'6&quot;"></div>
@@ -218,8 +218,8 @@ footer{margin-top:48px;font-family:var(--mono);font-size:11px;color:var(--steel)
       <div class="field"><label>Max payload per truck <span class="unit">lb &mdash; 0 = ignore</span></label><input type="number" id="s_payload" value="45000" min="0" step="100"></div>
       <div class="field"><label>Panels installed per day <span class="unit">count &mdash; 0 = ignore</span></label><input type="number" id="s_rate" value="15" min="0" step="1"></div>
       <div class="field"><label>Trucks loadable per day <span class="unit">plant capacity</span></label><input type="number" id="s_loadcap" value="2" min="1" step="1"></div>
-      <div class="field"><label>Preload days before install <span class="unit">days of loading</span></label><input type="number" id="s_preload" value="1" min="0" step="1"></div>
-      <div class="field"><label>Packing priority <span class="unit">trade-off</span></label><select id="s_prio"><option value="day1">Max daily throughput</option><option value="trucks">Fewest trucks</option></select></div>
+      <div class="field"><label>Preload days before install <span class="unit">days of loading "cushion"</span></label><input type="number" id="s_preload" value="1" min="0" step="1"></div>
+      <div class="field"><label>Packing priority <span class="unit">trade-off</span></label><select id="s_prio"><option value="trucks">Fewest trucks</option><option value="day1">Max daily throughput</option></select></div>
     </div>
     <div class="settings-actions">
       <button class="small" id="btnSaveSet">Save settings (.json)</button>
@@ -245,6 +245,7 @@ footer{margin-top:48px;font-family:var(--mono);font-size:11px;color:var(--steel)
     <button id="btnXlsx">Download trucking_plan.xlsx</button>
     <button id="btnCsv">Download trucking_plan.csv</button>
     <button id="btnTxt">Download trucking_layout.txt</button>
+    <button id="btnAllPng">Download all truck diagrams (PNG)</button>
   </div>
 </section>
 
@@ -1066,7 +1067,7 @@ function packTrucks(seq, st, fleet){
           types, W_max:Math.max(...types.map(t=>t.W_max)), L_max:Math.max(...types.map(t=>t.L_max))};
 }
 
-// width permit tier for a truck's widest panel (panels ride flat)
+// width permit tier for a truck's widest panel 
 function widthTier(acrossIn){
   if(acrossIn<=102) return {tier:"none",  label:"no width permit"};
   if(acrossIn<=144) return {tier:"permit",label:"WIDTH PERMIT "+fmtFtIn(acrossIn)};
@@ -1210,8 +1211,11 @@ function renderResults(R){
       const names=d.installed.length?(escapeHtml(d.installed[0].panel_name)+(d.installed.length>1?" &rarr; "+escapeHtml(d.installed[d.installed.length-1].panel_name):"")):null;
       const summaryLines=[];
       if(names) summaryLines.push("Panels "+names+" installed");
-      if(d.departed.length) summaryLines.push(d.departed.map(tn=>"Truck "+tn+" returns to shop").join("<br>"));
       if(d.arrivedToday&&d.arrivedToday.length) summaryLines.push(d.arrivedToday.map(tn=>"Truck "+tn+" arrives on site").join("<br>"));
+      if(d.departed.length){
+        const replaced=(d.arrivedToday&&d.arrivedToday.length)>0;
+        summaryLines.push(d.departed.map(tn=>"Truck "+tn+" empties and returns to shop"+(replaced?" &mdash; replaced on site by the arriving truck(s) above":"")).join("<br>"));
+      }
       if(d.staged&&d.staged.length) summaryLines.push(d.staged.length+" truck(s) staged at the shop, ready to ship");
       if(d.blockedBy!=null) summaryLines.push('<span style="color:var(--warn);font-weight:600">Crew blocked &mdash; waiting for TRUCK '+d.blockedBy+'</span>');
       h+='<div class="flowday"><div class="flowday-head">DAY '+d.day+'</div><div class="flowgrid">'
@@ -1301,6 +1305,23 @@ function truckCard(t,R){
   // Coordinate space spans the usable envelope (front OH + trailer + back OH);
   // the thick deck bar is the PHYSICAL trailer; rows are centered on the deck
   // and spill into the dashed overhang zones only when longer than the deck.
+  const svg=sideViewSvg(t,R);
+  card.insertAdjacentHTML("beforeend",svg);
+  card.insertAdjacentHTML("beforeend",'<div class="topview-label">Top view &mdash; bottom layer (deck contact)</div>');
+  card.insertAdjacentHTML("beforeend",topViewSvg(t,R));
+  card.insertAdjacentHTML("beforeend",'<div class="tfoot">Load order: Layer '+nLay+' (BOTTOM) first &rarr; Layer 1 (TOP) last. Install order runs top-down.</div>');
+  const pngBar=document.createElement("div"); pngBar.style.cssText="padding:12px 20px;border-top:1px solid var(--line)";
+  const pngBtn=document.createElement("button"); pngBtn.className="small"; pngBtn.textContent="Download PNG";
+  pngBtn.addEventListener("click",()=>exportTruckPng(t,R));
+  pngBar.appendChild(pngBtn);
+  card.appendChild(pngBar);
+  return card;
+}
+
+// ---- side-view stack SVG (extracted so it can be reused for on-screen display and PNG export) ----
+function sideViewSvg(t,R){
+  const st=R.st, L_max=(t.type?t.type.L_max:R.L_max);
+  const nLay=t.layers.length;
   const tyLen=(t.type&&t.type.len!=null)?t.type.len:L_max;
   const tyOvf=(t.type&&t.type.ovf!=null)?t.type.ovf:0;
   const tyOvb=(t.type&&t.type.ovb!=null)?t.type.ovb:0;
@@ -1413,11 +1434,7 @@ function truckCard(t,R){
     svg+='<text x="'+(padL-14)+'" y="'+(y+rowH/2+4)+'" font-size="10.5" fill="#5B6472" text-anchor="end">load '+(k+1)+'</text>';
   }
   svg+='</svg>';
-  card.insertAdjacentHTML("beforeend",svg);
-  card.insertAdjacentHTML("beforeend",'<div class="topview-label">Top view &mdash; bottom layer (deck contact)</div>');
-  card.insertAdjacentHTML("beforeend",topViewSvg(t,R));
-  card.insertAdjacentHTML("beforeend",'<div class="tfoot">Load order: Layer '+nLay+' (BOTTOM) first &rarr; Layer 1 (TOP) last. Install order runs top-down.</div>');
-  return card;
+  return svg;
 }
 
 // ---- top-down footprint of the BOTTOM layer only (what actually touches the deck) ----
@@ -1480,6 +1497,50 @@ function topViewSvg(t,R){
 }
 
 // ---------------------------------------------------------------- exports
+// ---- PNG export: rasterize a truck's side + top view diagrams onto one canvas ----
+function svgDims(svgStr){
+  const m=svgStr.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
+  return m?{w:+m[1],h:+m[2]}:{w:1100,h:400};
+}
+function svgToImage(svgStr){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>resolve(img);
+    img.onerror=reject;
+    img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svgStr);
+  });
+}
+async function exportTruckPng(t,R){
+  try{
+    const sideSvg=sideViewSvg(t,R), topSvg=topViewSvg(t,R);
+    const sd=svgDims(sideSvg), td=svgDims(topSvg);
+    const scale=2, gap=24, padOuter=16;
+    const W=Math.max(sd.w,td.w)+padOuter*2;
+    const H=sd.h+gap+td.h+padOuter*2;
+    const canvas=document.createElement("canvas");
+    canvas.width=Math.round(W*scale); canvas.height=Math.round(H*scale);
+    const ctx=canvas.getContext("2d");
+    ctx.scale(scale,scale);
+    ctx.fillStyle="#FFFFFF"; ctx.fillRect(0,0,W,H);
+    const [img1,img2]=await Promise.all([svgToImage(sideSvg),svgToImage(topSvg)]);
+    ctx.drawImage(img1,padOuter,padOuter,sd.w,sd.h);
+    ctx.drawImage(img2,padOuter,padOuter+sd.h+gap,td.w,td.h);
+    const a=document.createElement("a");
+    a.href=canvas.toDataURL("image/png");
+    a.download="truck_"+String(t.label).replace(/[^a-z0-9.]/gi,"_")+".png";
+    a.click();
+  }catch(err){
+    alert("Could not generate the PNG for this truck. Try again, or use a browser with SVG-to-canvas support (most current browsers work).");
+  }
+}
+$("btnAllPng").addEventListener("click",async()=>{
+  if(!lastResult||!lastResult.trucks.length) return;
+  for(const t of lastResult.trucks){
+    await exportTruckPng(t,lastResult);
+    await new Promise(res=>setTimeout(res,350));   // small stagger so the browser doesn't treat these as a download flood
+  }
+});
+
 function downloadText(name, text, mime){
   const blob=new Blob([text],{type:mime||"text/plain"});
   const a=document.createElement("a");
