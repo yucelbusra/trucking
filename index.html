@@ -45,6 +45,14 @@ header{border-bottom:3px solid var(--ink);padding:34px 0 20px;margin-bottom:32px
 .step-head .hint{font-size:13px;color:var(--steel);margin-left:auto}
 .step-body{padding:22px}
 
+/* ---------- project name ---------- */
+.projectbar{margin-bottom:18px}
+.projectbar label{display:block;font-family:var(--font-family);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--steel);margin-bottom:5px}
+.projectbar input{max-width:440px;font-size:14px;font-weight:600;padding:9px 11px}
+.projhead{border-left:4px solid var(--hivis);padding-left:12px;margin-bottom:20px}
+.projhead .pn{font-weight:800;font-stretch:92%;font-size:22px;text-transform:uppercase;letter-spacing:.02em;line-height:1.15}
+.projhead .ps{font-family:var(--font-family);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--steel);margin-top:6px}
+
 /* ---------- upload ---------- */
 .drop{border:2px dashed var(--line);background:var(--paper);padding:38px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
 .drop:hover,.drop.drag{border-color:var(--hivis);background:var(--hivis-soft)}
@@ -147,13 +155,21 @@ footer{margin-top:48px;font-family:var(--font-family);font-size:11px;color:var(-
   <div class="brand">
     <h1>Panel <span>Trucking</span> Planner</h1>
   </div>
-  <div <b id="hdrDate"></b></div>
+  <div class="manifest-no">
+    <b id="hdrProject">&mdash;</b>
+    <span id="hdrDate"></span>
+  </div>
 </header>
 
 <!-- STEP 1 -->
 <section class="step">
   <div class="step-head"><span class="step-tag">STEP 1</span><h2>Panel list</h2><span class="hint">.xlsx / .xls / .csv &mdash; first sheet is read</span></div>
   <div class="step-body">
+    <div class="projectbar">
+      <label for="projname">Project name</label>
+      <input type="text" id="projname" placeholder="e.g. Riverfront Tower - Phase 2" autocomplete="off">
+    </div>
+
     <div class="drop" id="drop" tabindex="0" role="button" aria-label="Upload panel list">
       <div class="big">Drop your Excel file here, or click to browse</div>
       <div class="sub">needs: install order &middot; panel name &middot; size (one "L x W" column or separate width / height) &middot; weight optional</div>
@@ -235,6 +251,7 @@ footer{margin-top:48px;font-family:var(--font-family);font-size:11px;color:var(-
 
 <!-- RESULTS -->
 <section id="results">
+  <div class="projhead" id="projhead" style="display:none"></div>
   <div class="sumstrip" id="sumstrip"></div>
   <div id="schedbox"></div>
   <h3 class="rsec">Truck stacks &mdash; side view, install order runs top-down; load bottom layer first</h3>
@@ -305,6 +322,12 @@ function num(v){ const f=parseFloat(v); return isNaN(f)?0:f; }
 let sheetHeaders=[], sheetRows=[], fileName="";
 const $=id=>document.getElementById(id);
 $("hdrDate").textContent = new Date().toISOString().slice(0,10);
+
+// ---------------------------------------------------------------- project name
+function projectName(){ const el=$("projname"); return el?el.value.trim():""; }
+function syncProjectHeader(){ $("hdrProject").textContent = projectName() || "\u2014"; }
+$("projname").addEventListener("input", syncProjectHeader);
+syncProjectHeader();
 
 // ---------------------------------------------------------------- upload
 const drop=$("drop"), fi=$("fileinput");
@@ -533,7 +556,7 @@ function readSettings(){
 }
 $("btnSaveSet").addEventListener("click",()=>{
   const raw={};
-  ["s_dun","s_dunoff","s_gap2","s_gapm","s_thick","s_count","s_payload","s_maxrow","s_suptol","s_prio","s_rate","s_fleet","s_wpolicy","s_legalh","s_loadcap","s_preload"]
+  ["projname","s_dun","s_dunoff","s_gap2","s_gapm","s_thick","s_count","s_payload","s_maxrow","s_suptol","s_prio","s_rate","s_fleet","s_wpolicy","s_legalh","s_loadcap","s_preload"]
     .forEach(id=>raw[id]=$(id).value);
   raw.rentals=rentalRows;
   raw.inhouse=inhouseRows;
@@ -550,6 +573,7 @@ $("setinput").addEventListener("change",()=>{
       Object.keys(raw).forEach(k=>{ if(typeof raw[k]==="string" && $(k)) $(k).value=raw[k]; });
       if(Array.isArray(raw.rentals)){ rentalRows=raw.rentals; renderRentals(); }
       if(Array.isArray(raw.inhouse)){ inhouseRows=raw.inhouse; renderInhouse(); }
+      syncProjectHeader();
     }catch(ex){ $("seterr").textContent="Could not read settings file: "+ex.message; $("seterr").style.display="block"; }
   };
   r.readAsText(f);
@@ -1134,6 +1158,19 @@ $("btnRun").addEventListener("click",()=>{
 // ---------------------------------------------------------------- render
 function renderResults(R){
   $("results").style.display="block";
+
+  // project banner above the summary
+  {
+    const pn=projectName(), ph=$("projhead");
+    if(pn){
+      ph.innerHTML='<div class="pn">'+escapeHtml(pn)+'</div>'
+        +'<div class="ps">Trucking plan &middot; '+new Date().toISOString().slice(0,10)+'</div>';
+      ph.style.display="block";
+    }else{
+      ph.innerHTML=""; ph.style.display="none";
+    }
+  }
+
   const anyWeight=R.seq.some(p=>p.weight_lb!=null);
   const loaded=R.seq.length-R.oversize.length;
 
@@ -1583,7 +1620,9 @@ $("btnXlsx").addEventListener("click",()=>{
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(planRows(lastResult)), "trucking_plan");
   // second sheet: per-truck summary
-  const sum=[["truck_no","truck_type","layers","panels","stack_height_in","payload_lb","dunnage_pcs","cost"]];
+  const sum=[];
+  if(projectName()) sum.push(["project",projectName()],[]);
+  sum.push(["truck_no","truck_type","layers","panels","stack_height_in","payload_lb","dunnage_pcs","cost"]);
   for(const t of lastResult.trucks)
     sum.push([t.label||t.no,t.typeName||"",t.layers.length,t.layers.reduce((s,l)=>s+l.length,0),Math.round(t.height*100)/100,Math.round(t.weight),
       t.layers.reduce((s2,l)=>s2+l.reduce((s3,p)=>s3+dunnageCount(p._lay_len),0),0), t.cost!=null?Math.round(t.cost):""]);
@@ -1601,6 +1640,7 @@ function layoutTxt(R){
   const lines=[];
   const bar="=".repeat(78), dash="-".repeat(78);
   lines.push(bar,"TRUCKING PLAN",bar);
+  if(projectName()) lines.push("PROJECT: "+projectName(), dash);
   lines.push("TOTAL LOADS NEEDED: "+R.trucks.length+"   |   TOTAL PHYSICAL TRUCKS: "+(R.totalPhysicalTrucks||R.trucks.length)+(R.totalPhysicalTrucks<R.trucks.length?" (some trucks reloaded and reused)":""));
   lines.push("TOTAL DUNNAGE PIECES TO OWN: "+(R.totalDunnageOwned||0)+"   |   ACROSS ALL LOADS (no reuse): "+(R.totalDunnageAllLoads||0)+((R.totalDunnageAllLoads||0)>(R.totalDunnageOwned||0)?" ("+((R.totalDunnageAllLoads||0)-(R.totalDunnageOwned||0))+" reused via truck reloads)":""));
   if(R.anyCostProvided) lines.push("TOTAL TRUCKING COST: $"+Math.round(R.totalCost||0).toLocaleString());
